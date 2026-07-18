@@ -1,3 +1,4 @@
+from __future__ import annotations
 import streamlit as st
 from utils.pdf_reader import extract_text, ExtractionResult
 

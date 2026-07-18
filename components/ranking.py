@@ -1,3 +1,4 @@
+from __future__ import annotations
 import streamlit as st
 
 NOT_FOUND = "Not Found"

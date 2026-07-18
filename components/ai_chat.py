@@ -1,3 +1,4 @@
+from __future__ import annotations
 import streamlit as st
 from ai.llm import get_llm
 from ai.chains import _invoke_with_retry

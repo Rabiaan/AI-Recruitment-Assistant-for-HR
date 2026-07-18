@@ -1,9 +1,11 @@
 import os
 from datetime import datetime
+
 import pandas as pd
 import streamlit as st
-from components.uploader import render_uploader
+
 from components.sidebar import render_sidebar
+from components.uploader import render_uploader
 from components.ranking import render_ranking
 from ai.chains import (
     build_summary_chain,
@@ -12,11 +14,19 @@ from ai.chains import (
     build_hr_chain,
     build_interview_questions_chain,
     parse_score,
+    parse_recommendation,
+    parse_skill_lists,
+    parse_interview_questions,
     _invoke_with_retry,
 )
+from utils.parser import CandidateResult, build_candidate_result
 
 
-def analyze_resume(resume_name: str, resume_text: str, jd_text: str):
+def analyze_resume(
+    resume_name: str,
+    resume_text: str,
+    jd_text: str,
+) -> CandidateResult:
     try:
         summary_chain = build_summary_chain()
         skill_match_chain = build_skill_match_chain()
@@ -24,146 +34,185 @@ def analyze_resume(resume_name: str, resume_text: str, jd_text: str):
         hr_chain = build_hr_chain()
         questions_chain = build_interview_questions_chain()
 
-        summary = _invoke_with_retry(summary_chain, resume_text)
-        skill_match = _invoke_with_retry(skill_match_chain, {"jd_text": jd_text, "resume_text": resume_text})
-        raw_score = _invoke_with_retry(score_chain, {"jd_text": jd_text, "skill_match": skill_match})
-        score = parse_score(raw_score)
+        summary = _invoke_with_retry(summary_chain, {"resume_text": resume_text})
 
-        recommendation_text = _invoke_with_retry(hr_chain, {
-            "score": str(score),
-            "missing_skills": "Extract missing skills from: " + skill_match,
-        })
+        skill_match = _invoke_with_retry(
+            skill_match_chain, {"jd_text": jd_text, "resume_text": resume_text}
+        )
 
-        recommendation, *justification_parts = recommendation_text.split("\n", 1)
-        justification = justification_parts[0].strip() if justification_parts else recommendation_text
+        score_text = _invoke_with_retry(
+            score_chain, {"jd_text": jd_text, "skill_match": skill_match}
+        )
 
-        if score >= 60:
-            questions_text = _invoke_with_retry(questions_chain, {
-                "jd_text": jd_text,
-                "summary": summary,
-            })
-            questions = {"technical_and_hr": [q.strip() for q in questions_text.split("\n") if q.strip()]}
-        else:
-            questions = {}
+        _, missing, _ = parse_skill_lists(skill_match)
+        score = parse_score(score_text)
 
-        matching = []
-        missing = []
-        extra = []
-        skill_section = None
-        current_list = None
-        for line in skill_match.split("\n"):
-            line_lower = line.lower()
-            if "matching skills" in line_lower:
-                skill_section = "matching"
-                current_list = matching
-                continue
-            elif "missing skills" in line_lower:
-                skill_section = "missing"
-                current_list = missing
-                continue
-            elif "extra skills" in line_lower:
-                skill_section = "extra"
-                current_list = extra
-                continue
-            if current_list is not None and line.strip().startswith("-"):
-                current_list.append(line.strip()[1:].strip())
+        hr_text = _invoke_with_retry(
+            hr_chain,
+            {
+                "score": str(score),
+                "missing_skills": ", ".join(missing),
+                "skill_match": skill_match,
+            },
+        )
 
-        return {
-            "name": resume_name,
-            "summary": summary.strip(),
-            "matching_skills": matching,
-            "missing_skills": missing,
-            "extra_skills": extra,
-            "score": score,
-            "recommendation": recommendation.strip(),
-            "justification": justification.strip(),
-            "interview_questions": questions,
-        }
+        interview_text = ""
+        rec, _ = parse_recommendation(hr_text)
+        if rec.lower() in ("hire", "interview"):
+            interview_text = _invoke_with_retry(
+                questions_chain, {"jd_text": jd_text, "summary": summary}
+            )
+
+        return build_candidate_result(
+            candidate_name=resume_name,
+            summary_text=summary,
+            skill_match_text=skill_match,
+            score_text=score_text,
+            hr_text=hr_text,
+            interview_text=interview_text,
+        )
+
     except Exception as e:
-        st.error(f"Error analyzing {resume_name}: {e}")
-        return {
-            "name": resume_name,
-            "summary": "Analysis failed",
-            "matching_skills": [],
-            "missing_skills": [],
-            "extra_skills": [],
-            "score": 0,
-            "recommendation": "Review Needed",
-            "justification": str(e),
-            "interview_questions": {},
-        }
+        return CandidateResult(
+            candidate_name=resume_name,
+            recommendation="Error - manual review needed",
+            justification=f"Analysis failed: {e}",
+        )
 
 
-def export_results(results, filename_prefix="candidate_analysis"):
-    if not results:
-        st.warning("No results to export.")
-        return None
-    df = pd.DataFrame(results)
-    df["matching_skills"] = df["matching_skills"].apply(lambda x: "; ".join(x))
-    df["missing_skills"] = df["missing_skills"].apply(lambda x: "; ".join(x))
-    df["extra_skills"] = df["extra_skills"].apply(lambda x: "; ".join(x))
-    df["interview_questions"] = df["interview_questions"].apply(lambda x: " | ".join([f"{k}: {', '.join(v)}" for k, v in x.items()]) if x else "")
+def persist_to_supabase(jd_id: str, results: list[CandidateResult], resume_texts: dict[str, str]):
+    try:
+        from ai.db import insert_candidate_result
+        for r in results:
+            insert_candidate_result(
+                jd_id=jd_id,
+                candidate_name=r.candidate_name,
+                resume_text=resume_texts.get(r.candidate_name, ""),
+                summary=r.summary,
+                education=r.education,
+                experience_years=r.experience_years,
+                matching_skills=r.matching_skills,
+                missing_skills=r.missing_skills,
+                extra_skills=r.extra_skills,
+                score=r.score,
+                recommendation=r.recommendation,
+                justification=r.justification,
+                technical_questions=r.technical_questions,
+                hr_questions=r.hr_questions,
+            )
+        return True
+    except Exception as e:
+        st.warning(f"Could not persist to Supabase: {e}")
+        return False
 
-    csv_buffer = df.to_csv(index=False).encode("utf-8")
+
+def export_csv(results: list[CandidateResult]) -> tuple[bytes, str]:
+    rows = []
+    for r in results:
+        rows.append({
+            "Name": r.candidate_name,
+            "Score": r.score,
+            "Recommendation": r.recommendation,
+            "Summary": r.summary,
+            "Education": r.education,
+            "Experience (yrs)": r.experience_years,
+            "Matching Skills": "; ".join(r.matching_skills),
+            "Missing Skills": "; ".join(r.missing_skills),
+            "Extra Skills": "; ".join(r.extra_skills),
+            "Justification": r.justification,
+            "Technical Questions": " | ".join(r.technical_questions),
+            "HR Questions": " | ".join(r.hr_questions),
+        })
+    df = pd.DataFrame(rows).sort_values("Score", ascending=False)
+    csv_bytes = df.to_csv(index=False).encode("utf-8")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = os.path.join("outputs", f"{filename_prefix}_{timestamp}.csv")
-    os.makedirs("outputs", exist_ok=True)
-    with open(output_path, "wb") as f:
-        f.write(csv_buffer)
+    filename = f"candidate_analysis_{timestamp}.csv"
 
-    return csv_buffer, output_path
+    os.makedirs("outputs", exist_ok=True)
+    with open(os.path.join("outputs", filename), "wb") as f:
+        f.write(csv_bytes)
+
+    return csv_bytes, filename
 
 
 def main():
-    st.set_page_config(page_title="AI Recruitment Assistant", layout="wide")
+    st.set_page_config(
+        page_title="AI Recruitment Assistant",
+        page_icon=":briefcase:",
+        layout="wide",
+    )
     render_sidebar()
 
     st.title("AI Recruitment Assistant Dashboard")
-    st.markdown("Upload a job description and resumes to get AI-powered candidate analysis.")
+    st.caption("Upload a job description and resumes to get AI-powered candidate analysis.")
 
-    jd_text, resume_texts = render_uploader()
+    jd_text, resume_tuples = render_uploader()
 
     analyze_clicked = st.button(
         "Analyze Resumes",
-        disabled=(not jd_text or len(resume_texts) == 0),
         type="primary",
+        disabled=(not jd_text or len(resume_tuples) == 0),
+        use_container_width=True,
     )
 
     if analyze_clicked:
-        if "results" not in st.session_state:
-            st.session_state.results = []
+        resume_map = {name: text for name, text in resume_tuples}
+        results: list[CandidateResult] = []
 
-        st.session_state.resumes = [r[0] for r in resume_texts]
-        st.session_state.jd_text = jd_text
+        progress = st.progress(0.0, text="Starting analysis...")
+        status = st.empty()
 
-        results = []
-        progress_bar = st.progress(0.0)
-        status_text = st.empty()
-
-        for idx, (name, text) in enumerate(resume_texts):
-            status_text.text(f"Analyzing {name} ({idx + 1}/{len(resume_texts)})...")
+        for idx, (name, text) in enumerate(resume_tuples):
+            status.info(f"Analyzing **{name}** ({idx + 1}/{len(resume_tuples)})...")
             result = analyze_resume(name, text, jd_text)
             results.append(result)
-            progress_bar.progress((idx + 1) / len(resume_texts))
+            progress.progress(
+                (idx + 1) / len(resume_tuples),
+                text=f"Completed {idx + 1}/{len(resume_tuples)}",
+            )
 
-        st.session_state.results = results
-        status_text.text("Analysis complete.")
+        status.success(f"Analysis complete — {len(results)} candidates processed.")
+        st.session_state.results = [r.model_dump() for r in results]
+
+        jd_title = resume_tuples[0][0] if resume_tuples else "Uploaded JD"
+        try:
+            from ai.db import insert_job_description
+            jd_row = insert_job_description(title=jd_title, raw_text=jd_text)
+            persist_to_supabase(jd_row["id"], results, resume_map)
+        except Exception as e:
+            st.warning(f"Supabase persistence skipped: {e}")
 
     if "results" in st.session_state and st.session_state.results:
         render_ranking(st.session_state.results)
 
         st.markdown("---")
         st.subheader("Export Results")
-        if st.button("Download CSV"):
-            csv_buffer, output_path = export_results(st.session_state.results)
-            if csv_buffer:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Generate CSV", use_container_width=True):
+                results = [CandidateResult(**r) for r in st.session_state.results]
+                csv_bytes, filename = export_csv(results)
                 st.download_button(
-                    label="Click to download CSV",
-                    data=csv_buffer,
-                    file_name=os.path.basename(output_path),
+                    label="Download CSV",
+                    data=csv_bytes,
+                    file_name=filename,
                     mime="text/csv",
+                    use_container_width=True,
                 )
-                st.success(f"Saved copy to {output_path}")
+
+        with col2:
+            try:
+                from ai.db import fetch_history
+                history = fetch_history(limit=50)
+                if history:
+                    with st.expander(f"Previous Analyses ({len(history)} records)"):
+                        hist_df = pd.DataFrame(history)
+                        cols = ["candidate_name", "score", "recommendation", "created_at"]
+                        available = [c for c in cols if c in hist_df.columns]
+                        st.dataframe(hist_df[available], use_container_width=True, hide_index=True)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

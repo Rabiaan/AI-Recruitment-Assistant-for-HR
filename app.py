@@ -11,10 +11,22 @@ except ImportError:
         return ""
 
 try:
-    from ai.chains import build_summary_chain, build_skill_match_chain, _invoke_with_retry
+    from ai.chains import build_summary_chain, build_skill_match_chain, build_score_chain, build_hr_chain, build_interview_questions_chain, parse_score, parse_recommendation, parse_skill_lists, parse_interview_questions, _invoke_with_retry
     AI_AVAILABLE = True
 except ImportError:
     AI_AVAILABLE = False
+
+try:
+    from utils.parser import CandidateResult, build_candidate_result
+except ImportError:
+    CandidateResult = None
+    build_candidate_result = None
+
+try:
+    from utils.pdf_reader import extract_text as pdf_extract
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
 
 SYSTEM_FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
 MONO_FONT = "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'Courier New', monospace"
@@ -223,6 +235,29 @@ def inject_global_css():
     .pulse-dot {{ width:6px; height:6px; border-radius:50%; background:var(--emerald-500); animation:pulse 2s infinite; display:inline-block; }}
 
     div[data-testid="stButton"] > button {{ border-radius:10px; }}
+
+    /* Upload page */
+    .upload-hero {{ text-align:center; padding:48px 0 32px; }}
+    .upload-hero-icon {{ width:64px; height:64px; border-radius:18px; background:linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
+        display:inline-flex; align-items:center; justify-content:center; margin-bottom:16px; }}
+    .upload-hero h2 {{ font-size:22px; font-weight:800; color:var(--text-primary); margin:0; }}
+    .upload-hero p {{ font-size:13px; color:var(--text-muted); margin:6px 0 0; }}
+    .upload-zone {{ background:#fff; border:2px dashed var(--border); border-radius:16px; padding:32px; text-align:center;
+        transition:border-color 0.2s, background 0.2s; cursor:pointer; }}
+    .upload-zone:hover {{ border-color:var(--indigo-400); background:var(--indigo-50); }}
+    .upload-zone-label {{ font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:4px; }}
+    .upload-zone-hint {{ font-size:11px; color:var(--text-muted); }}
+    .upload-file-row {{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg-section);
+        border-radius:10px; margin-bottom:6px; border:1px solid var(--border-light); }}
+    .upload-file-name {{ font-size:12px; font-weight:600; color:var(--text-primary); flex:1; }}
+    .upload-file-size {{ font-size:10px; color:var(--text-muted); font-family:{MONO_FONT}; }}
+    .upload-section-title {{ font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted);
+        font-family:{MONO_FONT}; font-weight:600; margin-bottom:10px; display:flex; align-items:center; gap:6px; }}
+    .nav-page-tabs {{ display:flex; gap:4px; }}
+    .nav-page-tab {{ padding:8px 18px; border-radius:8px; font-size:13px; font-weight:500; color:var(--text-muted);
+        cursor:pointer; border:none; background:transparent; transition:all 0.15s; display:flex; align-items:center; gap:6px; }}
+    .nav-page-tab:hover {{ background:var(--bg-section); color:var(--text-secondary); }}
+    .nav-page-tab.active {{ background:var(--indigo-50); color:var(--indigo-600); font-weight:600; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -254,6 +289,7 @@ def find_candidate(cid: str):
 # ============================================================
 
 def render_header():
+    page = st.session_state.get("page", "dashboard")
     st.markdown(f"""
     <div class="nav-header">
         <div class="nav-logo">
@@ -263,32 +299,53 @@ def render_header():
                 <div class="nav-subtitle">HR Intelligence Workspace</div>
             </div>
         </div>
+        <div class="nav-page-tabs">
+            <button class="nav-page-tab {'active' if page == 'dashboard' else ''}" id="nav_dash">
+                {icon("layers", 14)} Dashboard
+            </button>
+            <button class="nav-page-tab {'active' if page == 'upload' else ''}" id="nav_upload">
+                {icon("upload", 14)} Upload
+            </button>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    col_search, col_add, col_user = st.columns([5, 2, 3])
-    with col_search:
-        query = st.text_input(
-            "Search", key="search_query_widget", label_visibility="collapsed",
-            placeholder="Search by candidate name, role, or skill...",
-            value=st.session_state.search_query,
-        )
-        if query != st.session_state.search_query:
-            st.session_state.search_query = query
-            st.rerun()
-    with col_add:
-        if st.button(f"{icon('user-plus', 14, 'white')}  Add Candidate", key="open_add_modal", use_container_width=True, type="primary"):
-            add_candidate_dialog()
-    with col_user:
-        st.markdown(f"""
-        <div style="display:flex; align-items:center; gap:10px; justify-content:flex-end;">
-            <div class="nav-user-info">
-                <div class="nav-user-email">syedrabiaan@gmail.com</div>
-                <div class="nav-user-role">Recruiting Manager</div>
+    if page == "dashboard":
+        col_search, col_add, col_user = st.columns([5, 2, 3])
+        with col_search:
+            query = st.text_input(
+                "Search", key="search_query_widget", label_visibility="collapsed",
+                placeholder="Search by candidate name, role, or skill...",
+                value=st.session_state.search_query,
+            )
+            if query != st.session_state.search_query:
+                st.session_state.search_query = query
+                st.rerun()
+        with col_add:
+            if st.button(f"{icon('user-plus', 14, 'white')}  Add Candidate", key="open_add_modal", use_container_width=True, type="primary"):
+                add_candidate_dialog()
+        with col_user:
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; gap:10px; justify-content:flex-end;">
+                <div class="nav-user-info">
+                    <div class="nav-user-email">syedrabiaan@gmail.com</div>
+                    <div class="nav-user-role">Recruiting Manager</div>
+                </div>
+                <div class="nav-avatar">SR</div>
             </div>
-            <div class="nav-avatar">SR</div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+    else:
+        col_spacer, col_user = st.columns([7, 3])
+        with col_user:
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; gap:10px; justify-content:flex-end;">
+                <div class="nav-user-info">
+                    <div class="nav-user-email">syedrabiaan@gmail.com</div>
+                    <div class="nav-user-role">Recruiting Manager</div>
+                </div>
+                <div class="nav-avatar">SR</div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ============================================================
@@ -641,6 +698,242 @@ def add_candidate_dialog():
 
 
 # ============================================================
+# AI ANALYSIS PIPELINE
+# ============================================================
+
+def analyze_resume(resume_name: str, resume_text: str, jd_text: str):
+    if not AI_AVAILABLE or build_candidate_result is None:
+        return {"candidate_name": resume_name, "recommendation": "Error", "justification": "AI pipeline not available."}
+    try:
+        summary = _invoke_with_retry(build_summary_chain(), {"resume_text": resume_text})
+        skill_match = _invoke_with_retry(build_skill_match_chain(), {"jd_text": jd_text, "resume_text": resume_text})
+        score_text = _invoke_with_retry(build_score_chain(), {"jd_text": jd_text, "skill_match": skill_match})
+        _, missing, _ = parse_skill_lists(skill_match)
+        score = parse_score(score_text)
+        hr_text = _invoke_with_retry(build_hr_chain(), {"score": str(score), "missing_skills": ", ".join(missing), "skill_match": skill_match})
+        interview_text = ""
+        rec, _ = parse_recommendation(hr_text)
+        if rec.lower() in ("hire", "interview"):
+            interview_text = _invoke_with_retry(build_interview_questions_chain(), {"jd_text": jd_text, "summary": summary})
+        result = build_candidate_result(candidate_name=resume_name, summary_text=summary, skill_match_text=skill_match, score_text=score_text, hr_text=hr_text, interview_text=interview_text)
+        return result.model_dump()
+    except Exception as e:
+        return {"candidate_name": resume_name, "recommendation": "Error", "justification": f"Analysis failed: {e}"}
+
+
+def persist_results(jd_text: str, results: list[dict], resume_map: dict[str, str]):
+    try:
+        from ai.db import insert_job_description, insert_candidate_result
+        jd_row = insert_job_description(title="Uploaded JD", raw_text=jd_text)
+        jd_id = jd_row.get("id", "")
+        for r in results:
+            insert_candidate_result(
+                jd_id=jd_id, candidate_name=r.get("candidate_name", ""), resume_text=resume_map.get(r.get("candidate_name", ""), ""),
+                summary=r.get("summary", ""), education=r.get("education", ""),
+                experience_years=r.get("experience_years", 0),
+                matching_skills=r.get("matching_skills", []), missing_skills=r.get("missing_skills", []),
+                extra_skills=r.get("extra_skills", []), score=r.get("score", 0),
+                recommendation=r.get("recommendation", ""), justification=r.get("justification", ""),
+                technical_questions=r.get("technical_questions", []), hr_questions=r.get("hr_questions", []),
+                status="Sourced", email="",
+            )
+        return True
+    except Exception:
+        return False
+
+
+def load_candidates_from_db() -> list[dict]:
+    try:
+        from ai.db import fetch_history
+        rows = fetch_history(limit=200)
+        if not rows:
+            return []
+        candidates = []
+        for r in rows:
+            c = {
+                "id": r.get("id", ""),
+                "name": r.get("candidate_name", "Unknown"),
+                "role": r.get("education", "Not specified"),
+                "email": r.get("email", ""),
+                "joinedDate": (r.get("created_at", "") or "")[:10],
+                "status": r.get("status", "Sourced"),
+                "matchScore": r.get("score", 0),
+                "experienceYears": r.get("experience_years", 0),
+                "targetSalary": "Not specified",
+                "noticePeriod": "Not specified",
+                "skills": r.get("matching_skills", []) or [],
+                "metrics": {"weeklyActivity": min(r.get("score", 50), 100), "activitySplit": [{"label": "Technical", "value": 70}, {"label": "Communication", "value": 30}]},
+                "workingFormat": {"remote": 60, "hybrid": 30, "onsite": 10},
+                "history": [{"role": r.get("education", "Professional"), "company": "Previous Role", "period": "Career", "description": (r.get("summary", "") or "")[:200]}],
+                "strengths": (r.get("matching_skills", []) or [])[:5] or ["Strong technical profile."],
+                "gaps": (r.get("missing_skills", []) or [])[:5] or ["Needs further evaluation."],
+            }
+            candidates.append(c)
+        return candidates
+    except Exception:
+        return []
+
+
+# ============================================================
+# UPLOAD PAGE
+# ============================================================
+
+def render_upload_page():
+    st.markdown("""
+    <div class="upload-hero">
+        <div class="upload-hero-icon">
+    """ + icon("upload", 28, "white") + """
+        </div>
+        <h2>Upload Documents</h2>
+        <p>Upload a Job Description and candidate Resumes (PDFs) to begin AI-powered analysis.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_jd, col_cv = st.columns(2)
+
+    with col_jd:
+        st.markdown(f"""
+        <div class="upload-section-title">{icon("file-text", 14)} Job Description</div>
+        """, unsafe_allow_html=True)
+
+        jd_file = st.file_uploader("Upload JD", type=["pdf"], key="upload_jd", label_visibility="collapsed")
+        jd_text = ""
+
+        if jd_file:
+            if not jd_file.name.lower().endswith(".pdf"):
+                st.error("Only PDF files are accepted.")
+            elif jd_file.size > 10 * 1024 * 1024:
+                st.error("File exceeds 10 MB limit.")
+            elif PDF_AVAILABLE:
+                jd_file.seek(0)
+                result = pdf_extract(jd_file)
+                if result.success:
+                    jd_text = result.text
+                    st.success(f"Extracted — {result.page_count} page{'s' if result.page_count != 1 else ''}")
+                    with st.expander("Preview JD text"):
+                        st.text_area("JD Preview", jd_text, height=160, disabled=True, key="jd_preview")
+                else:
+                    st.warning(result.warning or "Could not extract text.")
+            else:
+                st.warning("PDF reader not available.")
+
+        st.markdown(f"""
+        <div class="upload-section-title" style="margin-top:24px;">{icon("users", 14)} Candidate Resumes</div>
+        """, unsafe_allow_html=True)
+
+        cv_files = st.file_uploader("Upload Resumes", type=["pdf"], accept_multiple_files=True, key="upload_cvs", label_visibility="collapsed")
+
+        resume_texts: list[tuple[str, str]] = []
+        skipped: list[str] = []
+
+        if cv_files:
+            for f in cv_files:
+                if not f.name.lower().endswith(".pdf"):
+                    skipped.append(f"{f.name}: not a PDF")
+                    continue
+                if f.size > 10 * 1024 * 1024:
+                    skipped.append(f"{f.name}: exceeds 10 MB")
+                    continue
+                if PDF_AVAILABLE:
+                    f.seek(0)
+                    result = pdf_extract(f)
+                    if result.success:
+                        resume_texts.append((f.name, result.text))
+                    else:
+                        skipped.append(f"{f.name}: {result.warning or 'extraction failed'}")
+                else:
+                    skipped.append(f"{f.name}: PDF reader not available")
+
+            if resume_texts:
+                st.success(f"{len(resume_texts)} resume{'s' if len(resume_texts) != 1 else ''} ready")
+            if skipped:
+                with st.expander(f"Skipped ({len(skipped)})"):
+                    for msg in skipped:
+                        st.warning(msg)
+
+    with col_cv:
+        if resume_texts or jd_text:
+            st.markdown(f"""
+            <div class="upload-section-title">{icon("target", 14)} Ready to Analyze</div>
+            """, unsafe_allow_html=True)
+
+            if jd_text:
+                st.markdown(f"""
+                <div class="upload-file-row">
+                    <span style="color:var(--indigo-600);">{icon("file-text", 16)}</span>
+                    <span class="upload-file-name">Job Description</span>
+                    <span class="upload-file-size">{len(jd_text)} chars</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            for name, text in resume_texts:
+                st.markdown(f"""
+                <div class="upload-file-row">
+                    <span style="color:var(--emerald-500);">{icon("user", 16)}</span>
+                    <span class="upload-file-name">{name}</span>
+                    <span class="upload-file-size">{len(text)} chars</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
+
+            if st.button(f"{icon('zap', 16, 'white')}  Analyze {len(resume_texts)} Candidate{'s' if len(resume_texts) != 1 else ''}", type="primary", use_container_width=True):
+                if not jd_text:
+                    st.error("Please upload a Job Description first.")
+                elif not resume_texts:
+                    st.error("Please upload at least one Resume.")
+                else:
+                    resume_map = {name: text for name, text in resume_texts}
+                    results = []
+                    progress = st.progress(0.0, text="Starting analysis...")
+                    status_box = st.empty()
+                    for idx, (name, text) in enumerate(resume_texts):
+                        status_box.info(f"Analyzing **{name}** ({idx + 1}/{len(resume_texts)})...")
+                        result = analyze_resume(name, text, jd_text)
+                        results.append(result)
+                        progress.progress((idx + 1) / len(resume_texts), text=f"Completed {idx + 1}/{len(resume_texts)}")
+                    status_box.success(f"Analysis complete — {len(results)} candidates processed.")
+
+                    # Merge into session state
+                    for r in results:
+                        new_cand = {
+                            "id": r.get("candidate_name", f"cand-{len(st.session_state.candidates)}"),
+                            "name": r.get("candidate_name", "Unknown"),
+                            "role": r.get("education", "Not specified"),
+                            "email": "",
+                            "joinedDate": datetime.now().strftime("%b %d, %Y"),
+                            "status": "Sourced",
+                            "matchScore": r.get("score", 0),
+                            "experienceYears": r.get("experience_years", 0),
+                            "targetSalary": "Not specified",
+                            "noticePeriod": "Not specified",
+                            "skills": r.get("matching_skills", []) or [],
+                            "metrics": {"weeklyActivity": min(r.get("score", 50), 100), "activitySplit": [{"label": "Technical", "value": 70}, {"label": "Communication", "value": 30}]},
+                            "workingFormat": {"remote": 60, "hybrid": 30, "onsite": 10},
+                            "history": [{"role": r.get("education", "Professional"), "company": "Previous Role", "period": "Career", "description": (r.get("summary", "") or "")[:200]}],
+                            "strengths": (r.get("matching_skills", []) or [])[:5] or ["Strong technical profile."],
+                            "gaps": (r.get("missing_skills", []) or [])[:5] or ["Needs further evaluation."],
+                        }
+                        st.session_state.candidates.insert(0, new_cand)
+
+                    # Persist to Supabase
+                    persist_results(jd_text, results, resume_map)
+
+                    st.session_state.selected_id = st.session_state.candidates[0]["id"]
+                    st.session_state.page = "dashboard"
+                    st.rerun()
+        else:
+            st.markdown(f"""
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                        padding:60px 20px;color:#94a3b8;text-align:center;">
+                <div style="margin-bottom:12px;">{icon("upload", 32, "#cbd5e1")}</div>
+                <p style="font-size:13px;font-weight:600;color:#64748b;margin:0;">No documents uploaded yet</p>
+                <p style="font-size:11px;color:#94a3b8;margin:4px 0 0;">Upload a JD and Resumes on the left to get started.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+# ============================================================
 # FOOTER
 # ============================================================
 
@@ -667,27 +960,62 @@ def main():
     inject_global_css()
 
     for key, default in [
-        ("candidates", list(INITIAL_CANDIDATES)),
-        ("selected_id", "cand-3"),
+        ("candidates", []),
+        ("selected_id", ""),
         ("status_tab", "All"),
         ("search_query", ""),
         ("chats", {}),
+        ("page", "dashboard"),
+        ("db_loaded", False),
     ]:
         if key not in st.session_state:
             st.session_state[key] = default
 
-    render_header()
-    render_stats()
+    # Load from DB on first run
+    if not st.session_state.db_loaded:
+        db_candidates = load_candidates_from_db()
+        if db_candidates:
+            st.session_state.candidates = db_candidates
+            if not st.session_state.selected_id and db_candidates:
+                st.session_state.selected_id = db_candidates[0]["id"]
+        elif not st.session_state.candidates:
+            st.session_state.candidates = list(INITIAL_CANDIDATES)
+            st.session_state.selected_id = "cand-3"
+        st.session_state.db_loaded = True
 
-    col_list, col_profile, col_right = st.columns([4, 5, 3])
-    with col_list:
-        render_candidate_list()
-    with col_profile:
-        render_profile()
-    with col_right:
-        render_ai_chat()
-        st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
-        render_agenda()
+    if not st.session_state.selected_id and st.session_state.candidates:
+        st.session_state.selected_id = st.session_state.candidates[0]["id"]
+
+    render_header()
+
+    page = st.session_state.page
+
+    # Page nav buttons (hidden, triggered by header buttons via JS workaround)
+    nav_cols = st.columns([1, 1, 8])
+    with nav_cols[0]:
+        if st.button("Dashboard", key="nav_dash_btn", use_container_width=True):
+            st.session_state.page = "dashboard"
+            st.rerun()
+    with nav_cols[1]:
+        if st.button("Upload", key="nav_upload_btn", use_container_width=True):
+            st.session_state.page = "upload"
+            st.rerun()
+
+    if page == "upload":
+        render_upload_page()
+    else:
+        render_stats()
+        col_list, col_profile, col_right = st.columns([4, 5, 3])
+        with col_list:
+            render_candidate_list()
+        with col_profile:
+            if st.session_state.candidates:
+                render_profile()
+        with col_right:
+            if st.session_state.candidates:
+                render_ai_chat()
+                st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+                render_agenda()
 
     render_footer()
 

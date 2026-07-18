@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from components.sidebar import render_sidebar
+from components.sidebar import render_sidebar, inject_custom_css
 from components.uploader import render_uploader
 from components.ranking import render_ranking
 from ai.chains import (
@@ -143,11 +143,16 @@ def main():
     )
     render_sidebar()
 
-    st.title("AI Recruitment Assistant Dashboard")
-    st.caption("Upload a job description and resumes to get AI-powered candidate analysis.")
+    st.markdown("""
+    <div class="main-header">
+        <h1>AI Recruitment Assistant</h1>
+        <p>Upload a job description and resumes to get AI-powered candidate analysis</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     jd_text, resume_tuples = render_uploader()
 
+    st.markdown("")
     analyze_clicked = st.button(
         "Analyze Resumes",
         type="primary",
@@ -186,15 +191,15 @@ def main():
         render_ranking(st.session_state.results)
 
         st.markdown("---")
-        st.subheader("Export Results")
-        col1, col2 = st.columns(2)
+        st.markdown("#### :floppy_disk: Export")
+        col1, col2 = st.columns([1, 1])
 
         with col1:
             if st.button("Generate CSV", use_container_width=True):
                 results = [CandidateResult(**r) for r in st.session_state.results]
                 csv_bytes, filename = export_csv(results)
                 st.download_button(
-                    label="Download CSV",
+                    label="Download CSV Report",
                     data=csv_bytes,
                     file_name=filename,
                     mime="text/csv",
@@ -206,7 +211,7 @@ def main():
                 from ai.db import fetch_history
                 history = fetch_history(limit=50)
                 if history:
-                    with st.expander(f"Previous Analyses ({len(history)} records)"):
+                    with st.expander(f":clock3: Previous Analyses ({len(history)} records)"):
                         hist_df = pd.DataFrame(history)
                         cols = ["candidate_name", "score", "recommendation", "created_at"]
                         available = [c for c in cols if c in hist_df.columns]

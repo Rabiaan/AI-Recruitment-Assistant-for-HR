@@ -6,6 +6,7 @@ from typing import Optional
 
 class CandidateResult(BaseModel):
     candidate_name: str = ""
+    email: str = "Not specified"
     summary: str = ""
     education: str = "Not specified"
     experience_years: float = 0.0
@@ -14,9 +15,11 @@ class CandidateResult(BaseModel):
     extra_skills: list[str] = Field(default_factory=list)
     score: int = 0
     recommendation: str = "Interview"
+    status: str = "Sourced"
     justification: str = ""
     technical_questions: list[str] = Field(default_factory=list)
     hr_questions: list[str] = Field(default_factory=list)
+    notes: str = ""
 
 
 def _strip_fences(text: str) -> str:

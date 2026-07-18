@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -14,20 +13,14 @@ def get_client() -> Client:
         url = os.getenv("SUPABASE_URL")
         key = os.getenv("SUPABASE_KEY")
         if not url or not key:
-            raise ValueError(
-                "SUPABASE_URL and SUPABASE_KEY must be set in your .env file."
-            )
+            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set.")
         _client = create_client(url, key)
     return _client
 
 
 def insert_job_description(title: str, raw_text: str) -> dict:
     client = get_client()
-    result = (
-        client.table("job_descriptions")
-        .insert({"title": title, "raw_text": raw_text})
-        .execute()
-    )
+    result = client.table("job_descriptions").insert({"title": title, "raw_text": raw_text}).execute()
     return result.data[0] if result.data else {}
 
 
@@ -46,6 +39,9 @@ def insert_candidate_result(
     justification: str = "",
     technical_questions: list[str] | None = None,
     hr_questions: list[str] | None = None,
+    email: str = "",
+    status: str = "Sourced",
+    notes: str = "",
 ) -> dict:
     client = get_client()
     row = {
@@ -63,42 +59,59 @@ def insert_candidate_result(
         "justification": justification,
         "technical_questions": technical_questions or [],
         "hr_questions": hr_questions or [],
+        "status": status,
+        "email": email,
+        "notes": notes,
     }
     result = client.table("candidates").insert(row).execute()
     return result.data[0] if result.data else {}
 
 
-def fetch_history(limit: int = 20) -> list[dict]:
+def update_candidate_status(candidate_id: str, status: str):
+    client = get_client()
+    client.table("candidates").update({"status": status}).eq("id", candidate_id).execute()
+
+
+def add_candidate_activity(candidate_id: str, activity_type: str, description: str) -> dict:
+    client = get_client()
+    result = client.table("candidate_activity").insert({
+        "candidate_id": candidate_id,
+        "activity_type": activity_type,
+        "description": description,
+    }).execute()
+    return result.data[0] if result.data else {}
+
+
+def fetch_candidate_activities(candidate_id: str) -> list[dict]:
     client = get_client()
     result = (
-        client.table("candidates")
+        client.table("candidate_activity")
         .select("*")
+        .eq("candidate_id", candidate_id)
         .order("created_at", desc=True)
-        .limit(limit)
         .execute()
     )
     return result.data or []
 
 
-def fetch_candidates_for_jd(jd_id: str) -> list[dict]:
+def fetch_history(limit: int = 50) -> list[dict]:
     client = get_client()
-    result = (
-        client.table("candidates")
-        .select("*")
-        .eq("jd_id", jd_id)
-        .order("score", desc=True)
-        .execute()
-    )
+    result = client.table("candidates").select("*").order("created_at", desc=True).limit(limit).execute()
     return result.data or []
 
 
 def fetch_jd_history(limit: int = 10) -> list[dict]:
     client = get_client()
-    result = (
-        client.table("job_descriptions")
-        .select("*")
-        .order("created_at", desc=True)
-        .limit(limit)
-        .execute()
-    )
+    result = client.table("job_descriptions").select("*").order("created_at", desc=True).limit(limit).execute()
     return result.data or []
+
+
+def get_status_counts() -> dict[str, int]:
+    client = get_client()
+    counts = {}
+    for status in ["Sourced", "In Progress", "Interview", "Hired"]:
+        result = client.table("candidates").select("id", count="exact").eq("status", status).execute()
+        counts[status] = result.count or 0
+    result = client.table("candidates").select("id", count="exact").execute()
+    counts["All"] = result.count or 0
+    return counts

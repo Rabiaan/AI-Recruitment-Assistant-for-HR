@@ -21,6 +21,14 @@ class CandidateResult(BaseModel):
     technical_questions: list[str] = Field(default_factory=list)
     hr_questions: list[str] = Field(default_factory=list)
     notes: str = ""
+    career_summary: str = ""
+    technical_depth: list[str] = Field(default_factory=list)
+    key_achievements: list[str] = Field(default_factory=list)
+    career_trajectory: list[str] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    cultural_fit: str = ""
+    growth_potential: str = ""
 
 
 def _strip_fences(text: str) -> str:
@@ -59,6 +67,7 @@ def build_candidate_result(
     score_text: str,
     hr_text: str,
     interview_text: str = "",
+    deep_analysis_text: str = "",
     retry_fn=None,
 ) -> CandidateResult:
     raw_data = {
@@ -66,6 +75,7 @@ def build_candidate_result(
         "summary": summary_text,
         "education": _extract_field(summary_text, "EDUCATION"),
         "experience_years": _extract_years(summary_text),
+        "email": _extract_field(summary_text, "EMAIL"),
         "matching_skills": [],
         "missing_skills": [],
         "extra_skills": [],
@@ -81,6 +91,7 @@ def build_candidate_result(
         parse_recommendation,
         parse_skill_lists,
         parse_interview_questions,
+        parse_deep_analysis,
     )
 
     matching, missing, extra = parse_skill_lists(skill_match_text)
@@ -98,6 +109,17 @@ def build_candidate_result(
         tech, beh = parse_interview_questions(interview_text)
         raw_data["technical_questions"] = tech
         raw_data["hr_questions"] = beh
+
+    if deep_analysis_text:
+        deep = parse_deep_analysis(deep_analysis_text)
+        raw_data["career_summary"] = deep.get("career_summary", "")
+        raw_data["technical_depth"] = deep.get("technical_depth", [])
+        raw_data["key_achievements"] = deep.get("key_achievements", [])
+        raw_data["career_trajectory"] = deep.get("career_trajectory", [])
+        raw_data["strengths"] = deep.get("strengths", [])
+        raw_data["weaknesses"] = deep.get("weaknesses", [])
+        raw_data["cultural_fit"] = deep.get("cultural_fit", "")
+        raw_data["growth_potential"] = deep.get("growth_potential", "")
 
     try:
         return CandidateResult(**raw_data)

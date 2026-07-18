@@ -11,7 +11,7 @@ except ImportError:
         return ""
 
 try:
-    from ai.chains import build_summary_chain, build_skill_match_chain, build_score_chain, build_hr_chain, build_interview_questions_chain, parse_score, parse_recommendation, parse_skill_lists, parse_interview_questions, _invoke_with_retry
+    from ai.chains import build_summary_chain, build_deep_analysis_chain, build_skill_match_chain, build_score_chain, build_hr_chain, build_interview_questions_chain, parse_score, parse_recommendation, parse_skill_lists, parse_interview_questions, _invoke_with_retry
     AI_AVAILABLE = True
 except ImportError:
     AI_AVAILABLE = False
@@ -40,16 +40,42 @@ STATUS_OPTIONS = ["Sourced", "In Progress", "Interview", "Hired"]
 def inject_global_css():
     st.markdown(f"""
     <style>
-    .stApp {{ font-family: {SYSTEM_FONT}; background: #ffffff; color: #0f172a; }}
-    .stApp header[data-testid="stHeader"] {{ background: transparent; }}
+    .stApp {{ font-family: {SYSTEM_FONT}; background: #ffffff; color: #0f172a; padding-left: 30px !important; padding-right: 30px !important; }}
+    .stApp header[data-testid="stHeader"] {{ display: none !important; }}
+    .stApp header[data-testid="stHeader"] [data-testid="stHorizontalBlock"] {{ align-items: center; }}
+    .stApp header[data-testid="stHeader"] [data-testid="stHorizontalBlock"] label {{ display: none !important; }}
+    .stApp header[data-testid="stHeader"] [data-testid="stHorizontalBlock"] p {{ display: none !important; }}
+    .stApp header[data-testid="stHeader"] [data-testid="stHorizontalBlock"] div[data-testid="stMarkdown"] {{ display: none !important; }}
+    .stApp header[data-testid="stHeader"] [data-testid="stHorizontalBlock"] > div > div:empty {{ display: none !important; }}
+    .stMain {{ padding-left: 30px !important; padding-right: 30px !important; }}
+    block[data-testid="stMain"] {{ padding-left: 30px !important; padding-right: 30px !important; }}
     #MainMenu {{ visibility: hidden; }}
     footer {{ visibility: hidden; }}
     .stDeployButton {{ display: none; }}
-    .block-container {{ padding-top: 0 !important; padding-bottom: 0 !important; padding-left: 0 !important; padding-right: 0 !important; max-width: 100% !important; width: 100% !important; }}
+    .block-container {{ padding-top: 0 !important; padding-bottom: 0 !important; padding-left: 30px !important; padding-right: 30px !important; max-width: 100% !important; width: 100% !important; }}
     section[data-testid="stSidebar"] {{ display: none; }}
     [data-testid="stToolbar"] {{ display: none; }}
     [data-testid="stDecoration"] {{ display: none; }}
     div[data-testid="stStatusWidget"] {{ display: none; }}
+
+    /* Search icon inside search input */
+    div[data-testid="stTextInput"][aria-label="Search"]::before,
+    div[data-testid="stTextInput"]::before {{
+        content: "";
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: contain;
+        z-index: 2;
+        pointer-events: none;
+    }}
+    div[data-testid="stTextInput"] {{ position: relative; }}
+    div[data-testid="stTextInput"] input {{ padding-left: 36px !important; }}
 
     :root {{
         --bg-section: #f9fafc; --border: #e5e7eb; --border-light: #f3f4f6;
@@ -169,6 +195,8 @@ def inject_global_css():
     div[data-testid="stButton"] > button {{ border-radius:10px; }}
 
     /* Filter tab buttons */
+    @keyframes filterSlideIn {{ 0% {{ opacity:0; transform:translateY(-6px); }} 100% {{ opacity:1; transform:translateY(0); }} }}
+    .filter-tabs {{ background:#f9fafc; border-radius:10px; padding:6px 8px; border:1px solid #e5e7eb; margin-bottom:10px; animation: filterSlideIn 0.3s ease-out; }}
     .filter-tabs div[data-testid="stButton"] > button {{
         background: #f9fafc !important;
         color: #000000 !important;
@@ -280,8 +308,8 @@ def find_candidate(cid: str):
 def render_header():
     page = st.session_state.get("page", "dashboard")
 
-    # Logo + Nav buttons in one row
-    logo_col, nav_col, user_col = st.columns([2, 3, 5])
+    # Logo + Nav buttons + Search + User in one row
+    logo_col, nav_col, search_col, user_col = st.columns([2, 2, 4, 3])
     with logo_col:
         st.markdown(f"""
         <div class="nav-logo" style="margin-top:8px;">
@@ -293,16 +321,22 @@ def render_header():
         </div>
         """, unsafe_allow_html=True)
     with nav_col:
-        dash_type = "primary" if page == "dashboard" else "secondary"
-        upload_type = "primary" if page == "upload" else "secondary"
         nav1, nav2 = st.columns(2)
         with nav1:
-            if st.button("Dashboard", key="nav_dashboard_btn", use_container_width=True, type=dash_type):
-                st.session_state.page = "dashboard"
-                st.rerun()
+            st.button("Dashboard", key="nav_dashboard_btn", use_container_width=True,
+                      on_click=lambda: st.session_state.update({"page": "dashboard"}))
         with nav2:
-            if st.button("Upload", key="nav_upload_btn_header", use_container_width=True, type=upload_type):
-                st.session_state.page = "upload"
+            st.button("Upload", key="nav_upload_btn_header", use_container_width=True,
+                      on_click=lambda: st.session_state.update({"page": "upload"}))
+    with search_col:
+        if page == "dashboard":
+            query = st.text_input(
+                "Search", key="search_query_widget", label_visibility="collapsed",
+                placeholder="Search by candidate name, role, or skill...",
+                value=st.session_state.search_query,
+            )
+            if query != st.session_state.search_query:
+                st.session_state.search_query = query
                 st.rerun()
     with user_col:
         st.markdown(f"""
@@ -314,16 +348,6 @@ def render_header():
             <div class="nav-avatar">SR</div>
         </div>
         """, unsafe_allow_html=True)
-
-    if page == "dashboard":
-        query = st.text_input(
-            "Search", key="search_query_widget", label_visibility="collapsed",
-            placeholder="Search by candidate name, role, or skill...",
-            value=st.session_state.search_query,
-        )
-        if query != st.session_state.search_query:
-            st.session_state.search_query = query
-            st.rerun()
 
 
 # ============================================================
@@ -378,7 +402,7 @@ def render_candidate_list():
     </div>
     """, unsafe_allow_html=True)
 
-    tabs = ["All"] + STATUS_OPTIONS
+    tabs = ["All"] + [s for s in STATUS_OPTIONS if s != "Hired"]
     st.markdown('<div class="filter-tabs">', unsafe_allow_html=True)
     tab_cols = st.columns(len(tabs))
     for i, t in enumerate(tabs):
@@ -467,15 +491,32 @@ def render_profile():
 
     st.markdown("<hr style='margin:14px 0; border-color:#f3f4f6;'>", unsafe_allow_html=True)
 
-    m1, m2 = st.columns(2)
+    m1, m2, m3 = st.columns(3)
     with m1:
         st.markdown(f'<div class="metric-card"><div class="metric-label">Experience</div>'
                      f'<div class="metric-value">{c["experienceYears"]} Years</div></div>', unsafe_allow_html=True)
     with m2:
         st.markdown(f'<div class="metric-card"><div class="metric-label">AI Match</div>'
                      f'<div class="metric-value accent">{c["matchScore"]}% Match</div></div>', unsafe_allow_html=True)
+    with m3:
+        rec = c.get("recommendation", "N/A")
+        rec_color = "#10b981" if rec.lower() == "hire" else "#f59e0b" if rec.lower() == "interview" else "#ef4444"
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Recommendation</div>'
+                     f'<div class="metric-value" style="color:{rec_color}; font-size:15px;">{rec}</div></div>', unsafe_allow_html=True)
 
     st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+
+    if c.get("email") and c["email"] != "Not specified":
+        st.markdown(f'<div style="font-size:11px; color:#64748b; margin-bottom:4px;">{icon("mail", 12)} {c["email"]}</div>', unsafe_allow_html=True)
+
+    justification = c.get("justification", "")
+    if justification and justification != "Not specified":
+        st.markdown(f"""
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:14px;">
+            <div style="font-size:10px; font-weight:700; text-transform:uppercase; color:#475569; margin-bottom:6px;">AI Justification</div>
+            <div style="font-size:12px; color:#334155; line-height:1.5;">{justification}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     wf_col, dial_col = st.columns(2)
     with wf_col:
@@ -511,6 +552,12 @@ def render_profile():
         </div>
         """, unsafe_allow_html=True)
 
+    summary = c.get("summary", "")
+    if summary and summary != "Not specified":
+        st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+        st.markdown('<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#475569; margin-bottom:8px;">AI Summary</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="font-size:12px; color:#334155; line-height:1.6; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0;">{summary}</div>', unsafe_allow_html=True)
+
     st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
     st.markdown(f'<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#475569; margin-bottom:10px;">{icon("briefcase", 14)} Career Trajectory History</div>', unsafe_allow_html=True)
     for job in c["history"]:
@@ -526,6 +573,12 @@ def render_profile():
     st.markdown("<hr style='margin:10px 0; border-color:#f3f4f6;'>", unsafe_allow_html=True)
     st.markdown('<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#475569; margin-bottom:8px;">Assessed Technical Skillset</div>', unsafe_allow_html=True)
     st.markdown("".join(f'<span class="skill-tag">{s}</span>' for s in c["skills"]), unsafe_allow_html=True)
+
+    extra_skills = c.get("extra_skills", [])
+    if extra_skills:
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+        st.markdown('<div style="font-size:11px; font-weight:700; text-transform:uppercase; color:#475569; margin-bottom:8px;">Additional Skills (Not in JD)</div>', unsafe_allow_html=True)
+        st.markdown("".join(f'<span class="skill-tag" style="background:#f0f9ff; color:#0369a1; border-color:#bae6fd;">{s}</span>' for s in extra_skills), unsafe_allow_html=True)
 
     st.markdown("<hr style='margin:14px 0; border-color:#f3f4f6;'>", unsafe_allow_html=True)
     sg_cols = st.columns(2)
@@ -546,27 +599,62 @@ def render_profile():
 def get_ai_response(candidate: dict, question: str) -> str:
     if AI_AVAILABLE:
         try:
-            q_lower = question.lower()
-            jd_text = " ".join(candidate.get("skills", []))
-            resume_text = candidate.get("role", "") + " " + " ".join(candidate.get("skills", []))
-            skill_match = "Matching: " + ", ".join(candidate.get("skills", []))
-            missing = ", ".join(candidate.get("gaps", []))
+            from langchain_core.prompts import ChatPromptTemplate
+            from langchain_core.output_parsers import StrOutputParser
+            from ai.llm import get_llm
 
-            if any(w in q_lower for w in ["interview", "question", "ask"]):
-                chain = build_interview_questions_chain()
-                return _invoke_with_retry(chain, {"jd_text": jd_text, "summary": resume_text})
-            elif any(w in q_lower for w in ["score", "match", "rating", "fit"]):
-                chain = build_score_chain()
-                return _invoke_with_retry(chain, {"jd_text": jd_text, "skill_match": skill_match})
-            elif any(w in q_lower for w in ["hire", "recommend", "decision", "hire"]):
-                chain = build_hr_chain()
-                score = str(candidate.get("matchScore", 50))
-                return _invoke_with_retry(chain, {"score": score, "missing_skills": missing, "skill_match": skill_match})
-            else:
-                chain = build_summary_chain()
-                return _invoke_with_retry(chain, {"resume_text": resume_text})
+            q_lower = question.lower()
+
+            cv_context = f"""CANDIDATE: {candidate.get('name', 'Unknown')}
+Role/Education: {candidate.get('role', 'Not specified')}
+Experience: {candidate.get('experienceYears', 0)} years
+AI Match Score: {candidate.get('matchScore', 0)}%
+Email: {candidate.get('email', 'Not specified')}
+Recommendation: {candidate.get('recommendation', 'N/A')}
+Justification: {candidate.get('justification', 'N/A')}
+
+RESUME SUMMARY:
+{candidate.get('summary', 'Not available')}
+
+CAREER SUMMARY:
+{candidate.get('career_summary', 'Not available')}
+
+SKILLS (Matching JD): {', '.join(candidate.get('skills', []))}
+EXTRA SKILLS (Not in JD): {', '.join(candidate.get('extra_skills', []))}
+MISSING SKILLS: {', '.join(candidate.get('missing_skills', []))}
+
+KEY ACHIEVEMENTS:
+{chr(10).join('- ' + a for a in candidate.get('key_achievements', [])) or 'Not available'}
+
+CAREER TRAJECTORY:
+{chr(10).join('- ' + t for t in candidate.get('career_trajectory_raw', [])) or 'Not available'}
+
+TECHNICAL DEPTH:
+{chr(10).join('- ' + d for d in candidate.get('technical_depth', [])) or 'Not available'}
+
+STRENGTHS: {', '.join(candidate.get('strengths', []))}
+WEAKNESSES: {', '.join(candidate.get('gaps', []))}
+CULTURAL FIT: {candidate.get('cultural_fit', 'Not available')}
+GROWTH POTENTIAL: {candidate.get('growth_potential', 'Not available')}"""
+
+            hr_system = (
+                "You are an expert HR recruitment assistant. You have access to a candidate's full CV analysis data below. "
+                "Answer the user's question ONLY based on this candidate's data. Be specific, cite actual skills, achievements, and metrics from the profile. "
+                "If the information is not in the profile, say so clearly.\n\n"
+                f"CANDIDATE PROFILE:\n{cv_context}"
+            )
+
+            chat_prompt = ChatPromptTemplate.from_messages([
+                ("system", hr_system),
+                ("human", "{question}"),
+            ])
+
+            llm = get_llm(temperature=0.3)
+            chain = chat_prompt | llm | StrOutputParser()
+            return _invoke_with_retry(chain, {"question": question})
         except Exception as e:
             return f"AI analysis failed: {e}"
+
     return (f"AI pipeline not connected.\n\n"
             f"Based on {candidate['name']}'s profile ({candidate['matchScore']}% match):\n"
             f"Skills: {', '.join(candidate.get('skills', []))}\n"
@@ -633,7 +721,7 @@ def render_ai_chat():
         question = st.text_input("Ask", key=f"chat_input_{c['id']}", label_visibility="collapsed",
                                   placeholder="Ask anything about candidate...")
     with input_cols[1]:
-        if st.button("Send", key=f"send_{c['id']}", use_container_width=True) and question.strip():
+        if st.button("➤", key=f"send_{c['id']}", use_container_width=True) and question.strip():
             _run_ai_query(c, question)
             st.rerun()
 
@@ -691,6 +779,7 @@ def analyze_resume(resume_name: str, resume_text: str, jd_text: str):
         return {"candidate_name": resume_name, "recommendation": "Error", "justification": "AI pipeline not available."}
     try:
         summary = _invoke_with_retry(build_summary_chain(), {"resume_text": resume_text})
+        deep_analysis = _invoke_with_retry(build_deep_analysis_chain(), {"resume_text": resume_text})
         skill_match = _invoke_with_retry(build_skill_match_chain(), {"jd_text": jd_text, "resume_text": resume_text})
         score_text = _invoke_with_retry(build_score_chain(), {"jd_text": jd_text, "skill_match": skill_match})
         _, missing, _ = parse_skill_lists(skill_match)
@@ -700,9 +789,12 @@ def analyze_resume(resume_name: str, resume_text: str, jd_text: str):
         rec, _ = parse_recommendation(hr_text)
         if rec.lower() in ("hire", "interview"):
             interview_text = _invoke_with_retry(build_interview_questions_chain(), {"jd_text": jd_text, "summary": summary})
-        result = build_candidate_result(candidate_name=resume_name, summary_text=summary, skill_match_text=skill_match, score_text=score_text, hr_text=hr_text, interview_text=interview_text)
+        result = build_candidate_result(candidate_name=resume_name, summary_text=summary, skill_match_text=skill_match, score_text=score_text, hr_text=hr_text, interview_text=interview_text, deep_analysis_text=deep_analysis)
         return result.model_dump()
     except Exception as e:
+        err_msg = str(e)
+        if "429" in err_msg or "resource_exhausted" in err_msg or "quota" in err_msg.lower():
+            return {"candidate_name": resume_name, "recommendation": "Error", "justification": "Gemini API quota exceeded. Please wait a few minutes and try again, or upgrade your API plan."}
         return {"candidate_name": resume_name, "recommendation": "Error", "justification": f"Analysis failed: {e}"}
 
 
@@ -720,7 +812,15 @@ def persist_results(jd_text: str, results: list[dict], resume_map: dict[str, str
                 extra_skills=r.get("extra_skills", []), score=r.get("score", 0),
                 recommendation=r.get("recommendation", ""), justification=r.get("justification", ""),
                 technical_questions=r.get("technical_questions", []), hr_questions=r.get("hr_questions", []),
-                status="Sourced", email="",
+                status="Sourced", email=r.get("email", ""),
+                career_summary=r.get("career_summary", ""),
+                technical_depth=r.get("technical_depth", []),
+                key_achievements=r.get("key_achievements", []),
+                career_trajectory=r.get("career_trajectory", []),
+                ai_strengths=r.get("strengths", []),
+                ai_weaknesses=r.get("weaknesses", []),
+                cultural_fit=r.get("cultural_fit", ""),
+                growth_potential=r.get("growth_potential", ""),
             )
         return True
     except Exception:
@@ -735,6 +835,28 @@ def load_candidates_from_db() -> list[dict]:
             return []
         candidates = []
         for r in rows:
+            history = r.get("career_trajectory", []) or []
+            history_items = []
+            for h in history:
+                parts = h.split(":", 1)
+                if len(parts) == 2:
+                    role_part = parts[0].strip()
+                    desc = parts[1].strip()
+                    rp = role_part.split(" at ")
+                    role_name = rp[0].strip() if rp else role_part
+                    company = rp[1].strip() if len(rp) > 1 else "Previous Role"
+                    pp = company.split("(")
+                    company_name = pp[0].strip() if pp else company
+                    period = pp[1].rstrip(")").strip() if len(pp) > 1 else "Career"
+                    history_items.append({"role": role_name, "company": company_name, "period": period, "description": desc})
+            if not history_items:
+                history_items = [{"role": r.get("education", "Professional"), "company": "Previous Role", "period": "Career", "description": (r.get("summary", "") or "")[:200]}]
+
+            ai_strengths = r.get("ai_strengths", []) or []
+            ai_weaknesses = r.get("ai_weaknesses", []) or []
+            matching = (r.get("matching_skills", []) or [])
+            missing = (r.get("missing_skills", []) or [])
+
             c = {
                 "id": r.get("id", ""),
                 "name": r.get("candidate_name", "Unknown"),
@@ -746,12 +868,25 @@ def load_candidates_from_db() -> list[dict]:
                 "experienceYears": r.get("experience_years", 0),
                 "targetSalary": "Not specified",
                 "noticePeriod": "Not specified",
-                "skills": r.get("matching_skills", []) or [],
+                "skills": matching,
+                "extra_skills": r.get("extra_skills", []) or [],
+                "missing_skills": missing,
+                "summary": r.get("summary", ""),
+                "career_summary": r.get("career_summary", ""),
+                "justification": r.get("justification", ""),
+                "recommendation": r.get("recommendation", ""),
+                "technical_questions": r.get("technical_questions", []) or [],
+                "hr_questions": r.get("hr_questions", []) or [],
+                "technical_depth": r.get("technical_depth", []) or [],
+                "key_achievements": r.get("key_achievements", []) or [],
+                "career_trajectory_raw": r.get("career_trajectory", []) or [],
+                "cultural_fit": r.get("cultural_fit", ""),
+                "growth_potential": r.get("growth_potential", ""),
                 "metrics": {"weeklyActivity": min(r.get("score", 50), 100), "activitySplit": [{"label": "Technical", "value": 70}, {"label": "Communication", "value": 30}]},
                 "workingFormat": {"remote": 60, "hybrid": 30, "onsite": 10},
-                "history": [{"role": r.get("education", "Professional"), "company": "Previous Role", "period": "Career", "description": (r.get("summary", "") or "")[:200]}],
-                "strengths": (r.get("matching_skills", []) or [])[:5] or ["Strong technical profile."],
-                "gaps": (r.get("missing_skills", []) or [])[:5] or ["Needs further evaluation."],
+                "history": history_items,
+                "strengths": (ai_strengths[:3] if ai_strengths else matching[:3]) or ["Strong technical profile."],
+                "gaps": (ai_weaknesses[:3] if ai_weaknesses else missing[:3]) or ["Needs further evaluation."],
             }
             candidates.append(c)
         return candidates
@@ -885,7 +1020,7 @@ def render_upload_page():
                             "id": r.get("candidate_name", f"cand-{len(st.session_state.candidates)}"),
                             "name": r.get("candidate_name", "Unknown"),
                             "role": r.get("education", "Not specified"),
-                            "email": "",
+                            "email": r.get("email", ""),
                             "joinedDate": datetime.now().strftime("%b %d, %Y"),
                             "status": "Sourced",
                             "matchScore": r.get("score", 0),
@@ -893,11 +1028,24 @@ def render_upload_page():
                             "targetSalary": "Not specified",
                             "noticePeriod": "Not specified",
                             "skills": r.get("matching_skills", []) or [],
+                            "extra_skills": r.get("extra_skills", []) or [],
+                            "missing_skills": r.get("missing_skills", []) or [],
+                            "summary": r.get("summary", ""),
+                            "career_summary": r.get("career_summary", ""),
+                            "justification": r.get("justification", ""),
+                            "recommendation": r.get("recommendation", ""),
+                            "technical_questions": r.get("technical_questions", []) or [],
+                            "hr_questions": r.get("hr_questions", []) or [],
+                            "technical_depth": r.get("technical_depth", []) or [],
+                            "key_achievements": r.get("key_achievements", []) or [],
+                            "career_trajectory_raw": r.get("career_trajectory", []) or [],
+                            "cultural_fit": r.get("cultural_fit", ""),
+                            "growth_potential": r.get("growth_potential", ""),
                             "metrics": {"weeklyActivity": min(r.get("score", 50), 100), "activitySplit": [{"label": "Technical", "value": 70}, {"label": "Communication", "value": 30}]},
                             "workingFormat": {"remote": 60, "hybrid": 30, "onsite": 10},
                             "history": [{"role": r.get("education", "Professional"), "company": "Previous Role", "period": "Career", "description": (r.get("summary", "") or "")[:200]}],
-                            "strengths": (r.get("matching_skills", []) or [])[:5] or ["Strong technical profile."],
-                            "gaps": (r.get("missing_skills", []) or [])[:5] or ["Needs further evaluation."],
+                            "strengths": (r.get("strengths", []) or [])[:3] or (r.get("matching_skills", []) or [])[:3] or ["Strong technical profile."],
+                            "gaps": (r.get("weaknesses", []) or [])[:3] or (r.get("missing_skills", []) or [])[:3] or ["Needs further evaluation."],
                         }
                         st.session_state.candidates.insert(0, new_cand)
 

@@ -5,6 +5,7 @@ from langchain_core.output_parsers import StrOutputParser
 from .llm import get_llm
 from utils.prompts import (
     summary_prompt,
+    deep_analysis_prompt,
     skill_match_prompt,
     score_prompt,
     hr_prompt,
@@ -12,7 +13,7 @@ from utils.prompts import (
 )
 
 
-def _invoke_with_retry(chain, inputs, max_retries=2, backoff=3.0):
+def _invoke_with_retry(chain, inputs, max_retries=3, backoff=15.0):
     last_error = None
     for attempt in range(max_retries):
         try:
@@ -20,9 +21,10 @@ def _invoke_with_retry(chain, inputs, max_retries=2, backoff=3.0):
         except Exception as e:
             last_error = e
             msg = str(e).lower()
-            if any(kw in msg for kw in ("rate", "quota", "429", "503", "timeout")):
+            if any(kw in msg for kw in ("rate", "quota", "429", "503", "timeout", "resource_exhausted")):
                 if attempt < max_retries - 1:
-                    time.sleep(backoff * (attempt + 1))
+                    wait = backoff * (attempt + 1)
+                    time.sleep(wait)
                     continue
             raise
     raise last_error
@@ -31,6 +33,11 @@ def _invoke_with_retry(chain, inputs, max_retries=2, backoff=3.0):
 def build_summary_chain():
     llm = get_llm(temperature=0.2)
     return summary_prompt | llm | StrOutputParser()
+
+
+def build_deep_analysis_chain():
+    llm = get_llm(temperature=0.3)
+    return deep_analysis_prompt | llm | StrOutputParser()
 
 
 def build_skill_match_chain():
@@ -110,3 +117,44 @@ def parse_interview_questions(text: str) -> tuple[list[str], list[str]]:
             if q:
                 current.append(q)
     return technical, behavioral
+
+
+def parse_deep_analysis(text: str) -> dict:
+    result = {
+        "career_summary": "",
+        "technical_depth": [],
+        "key_achievements": [],
+        "career_trajectory": [],
+        "strengths": [],
+        "weaknesses": [],
+        "cultural_fit": "",
+        "growth_potential": "",
+    }
+    current_section = None
+    for line in text.split("\n"):
+        stripped = line.strip()
+        upper = stripped.upper()
+        if upper.startswith("CAREER_SUMMARY:"):
+            result["career_summary"] = stripped.split(":", 1)[1].strip()
+            current_section = None
+        elif "TECHNICAL_DEPTH" in upper:
+            current_section = "technical_depth"
+        elif "KEY_ACHIEVEMENTS" in upper:
+            current_section = "key_achievements"
+        elif "CAREER_TRAJECTORY" in upper:
+            current_section = "career_trajectory"
+        elif upper.startswith("STRENGTHS:"):
+            current_section = "strengths"
+        elif upper.startswith("WEAKNESSES:"):
+            current_section = "weaknesses"
+        elif "CULTURAL_FIT:" in upper:
+            result["cultural_fit"] = stripped.split(":", 1)[1].strip()
+            current_section = None
+        elif "GROWTH_POTENTIAL:" in upper:
+            result["growth_potential"] = stripped.split(":", 1)[1].strip()
+            current_section = None
+        elif current_section and stripped.startswith("-"):
+            item = stripped.lstrip("-").strip()
+            if item:
+                result[current_section].append(item)
+    return result

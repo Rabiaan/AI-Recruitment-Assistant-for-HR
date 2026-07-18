@@ -31,6 +31,14 @@ CREATE TABLE candidates (
   technical_questions text[],
   hr_questions text[],
   notes text default '',
+  career_summary text default '',
+  technical_depth text[],
+  key_achievements text[],
+  career_trajectory text[],
+  ai_strengths text[],
+  ai_weaknesses text[],
+  cultural_fit text default '',
+  growth_potential text default '',
   created_at timestamptz default now()
 );
 

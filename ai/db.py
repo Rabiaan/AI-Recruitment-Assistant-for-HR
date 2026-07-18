@@ -54,6 +54,14 @@ def insert_candidate_result(
     email: str = "",
     status: str = "Sourced",
     notes: str = "",
+    career_summary: str = "",
+    technical_depth: list[str] | None = None,
+    key_achievements: list[str] | None = None,
+    career_trajectory: list[str] | None = None,
+    ai_strengths: list[str] | None = None,
+    ai_weaknesses: list[str] | None = None,
+    cultural_fit: str = "",
+    growth_potential: str = "",
 ) -> dict:
     client = get_client()
     row = {
@@ -74,6 +82,14 @@ def insert_candidate_result(
         "status": status,
         "email": email,
         "notes": notes,
+        "career_summary": career_summary,
+        "technical_depth": technical_depth or [],
+        "key_achievements": key_achievements or [],
+        "career_trajectory": career_trajectory or [],
+        "ai_strengths": ai_strengths or [],
+        "ai_weaknesses": ai_weaknesses or [],
+        "cultural_fit": cultural_fit,
+        "growth_potential": growth_potential,
     }
     result = client.table("candidates").insert(row).execute()
     return result.data[0] if result.data else {}

@@ -1,12 +1,26 @@
 from langchain_core.prompts import ChatPromptTemplate
 
 SUMMARY_SYSTEM = (
-    "You are a senior HR analyst. Extract a structured summary from the resume below.\n"
+    "You are a senior HR analyst. Extract a detailed structured summary from the resume below.\n"
     "Return EXACTLY this format (use 'Not specified' for anything missing):\n"
     "EDUCATION: <degree, institution, year>\n"
     "EXPERIENCE: <total years and brief description>\n"
     "TOP SKILLS: <comma-separated list>\n"
-    "HIGHLIGHTS: <2-3 bullet points of notable achievements>"
+    "EMAIL: <email if found, else Not specified>\n"
+    "HIGHLIGHTS:\n- <achievement 1>\n- <achievement 2>\n- <achievement 3>"
+)
+
+DEEP_ANALYSIS_SYSTEM = (
+    "You are an expert talent analyst. Perform a deep analysis of this candidate's resume.\n"
+    "Return EXACTLY this format (use 'Not specified' for anything missing):\n"
+    "CAREER_SUMMARY: <2-3 sentence professional overview>\n"
+    "TECHNICAL_DEPTH:\n- <area>: <proficiency level — Beginner/Intermediate/Advanced/Expert>\n- ...\n"
+    "KEY_ACHIEVEMENTS:\n- <quantified achievement 1>\n- <quantified achievement 2>\n- <quantified achievement 3>\n"
+    "CAREER_TRAJECTORY:\n- <role> at <company> (<period>): <1-line impact>\n- ...\n"
+    "STRENGTHS:\n- <strength 1>\n- <strength 2>\n- <strength 3>\n"
+    "WEAKNESSES:\n- <weakness 1>\n- <weakness 2>\n"
+    "CULTURAL_FIT: <1-2 sentences on soft skills, leadership, teamwork>\n"
+    "GROWTH_POTENTIAL: <1-2 sentences on trajectory and upward mobility>"
 )
 
 SKILL_MATCH_SYSTEM = (
@@ -48,6 +62,11 @@ INTERVIEW_SYSTEM = (
 
 summary_prompt = ChatPromptTemplate.from_messages([
     ("system", SUMMARY_SYSTEM),
+    ("human", "Resume:\n{resume_text}"),
+])
+
+deep_analysis_prompt = ChatPromptTemplate.from_messages([
+    ("system", DEEP_ANALYSIS_SYSTEM),
     ("human", "Resume:\n{resume_text}"),
 ])
 

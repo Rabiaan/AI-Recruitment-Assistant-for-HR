@@ -185,11 +185,6 @@ def inject_global_css():
     .upload-file-size {{ font-size:10px; color:var(--text-muted); font-family:{MONO_FONT}; }}
     .upload-section-title {{ font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted);
         font-family:{MONO_FONT}; font-weight:600; margin-bottom:10px; display:flex; align-items:center; gap:6px; }}
-    .nav-page-tabs {{ display:flex; gap:4px; }}
-    .nav-page-tab {{ padding:8px 18px; border-radius:8px; font-size:13px; font-weight:500; color:var(--text-muted);
-        cursor:pointer; border:none; background:transparent; transition:all 0.15s; display:flex; align-items:center; gap:6px; }}
-    .nav-page-tab:hover {{ background:var(--bg-section); color:var(--text-secondary); }}
-    .nav-page-tab.active {{ background:var(--indigo-50); color:var(--indigo-600); font-weight:600; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -222,28 +217,44 @@ def find_candidate(cid: str):
 
 def render_header():
     page = st.session_state.get("page", "dashboard")
-    st.markdown(f"""
-    <div class="nav-header">
-        <div class="nav-logo">
+
+    # Logo + Nav buttons in one row
+    logo_col, nav_col, user_col = st.columns([2, 3, 5])
+    with logo_col:
+        st.markdown(f"""
+        <div class="nav-logo" style="margin-top:8px;">
             <div class="nav-logo-icon">{icon("sparkles", 18, "white")}</div>
             <div>
                 <div class="nav-logo-text">TalentAI <span class="nav-badge">RECRUIT</span></div>
                 <div class="nav-subtitle">HR Intelligence Workspace</div>
             </div>
         </div>
-        <div class="nav-page-tabs">
-            <button class="nav-page-tab {'active' if page == 'dashboard' else ''}" id="nav_dash">
-                {icon("layers", 14)} Dashboard
-            </button>
-            <button class="nav-page-tab {'active' if page == 'upload' else ''}" id="nav_upload">
-                {icon("upload", 14)} Upload
-            </button>
+        """, unsafe_allow_html=True)
+    with nav_col:
+        dash_type = "primary" if page == "dashboard" else "secondary"
+        upload_type = "primary" if page == "upload" else "secondary"
+        nav1, nav2 = st.columns(2)
+        with nav1:
+            if st.button(f"{icon('layers', 14)}  Dashboard", key="nav_dashboard_btn", use_container_width=True, type=dash_type):
+                st.session_state.page = "dashboard"
+                st.rerun()
+        with nav2:
+            if st.button(f"{icon('upload', 14)}  Upload", key="nav_upload_btn_header", use_container_width=True, type=upload_type):
+                st.session_state.page = "upload"
+                st.rerun()
+    with user_col:
+        st.markdown(f"""
+        <div style="display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-top:8px;">
+            <div class="nav-user-info">
+                <div class="nav-user-email">syedrabiaan@gmail.com</div>
+                <div class="nav-user-role">Recruiting Manager</div>
+            </div>
+            <div class="nav-avatar">SR</div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     if page == "dashboard":
-        col_search, col_add, col_user = st.columns([5, 2, 3])
+        col_search, col_add, col_spacer = st.columns([5, 2, 3])
         with col_search:
             query = st.text_input(
                 "Search", key="search_query_widget", label_visibility="collapsed",
@@ -256,28 +267,6 @@ def render_header():
         with col_add:
             if st.button(f"{icon('user-plus', 14, 'white')}  Add Candidate", key="open_add_modal", use_container_width=True, type="primary"):
                 add_candidate_dialog()
-        with col_user:
-            st.markdown(f"""
-            <div style="display:flex; align-items:center; gap:10px; justify-content:flex-end;">
-                <div class="nav-user-info">
-                    <div class="nav-user-email">syedrabiaan@gmail.com</div>
-                    <div class="nav-user-role">Recruiting Manager</div>
-                </div>
-                <div class="nav-avatar">SR</div>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        col_spacer, col_user = st.columns([7, 3])
-        with col_user:
-            st.markdown(f"""
-            <div style="display:flex; align-items:center; gap:10px; justify-content:flex-end;">
-                <div class="nav-user-info">
-                    <div class="nav-user-email">syedrabiaan@gmail.com</div>
-                    <div class="nav-user-role">Recruiting Manager</div>
-                </div>
-                <div class="nav-avatar">SR</div>
-            </div>
-            """, unsafe_allow_html=True)
 
 
 # ============================================================
@@ -954,17 +943,6 @@ def main():
     render_header()
 
     page = st.session_state.page
-
-    # Page nav buttons (hidden, triggered by header buttons via JS workaround)
-    nav_cols = st.columns([1, 1, 8])
-    with nav_cols[0]:
-        if st.button("Dashboard", key="nav_dash_btn", use_container_width=True):
-            st.session_state.page = "dashboard"
-            st.rerun()
-    with nav_cols[1]:
-        if st.button("Upload", key="nav_upload_btn", use_container_width=True):
-            st.session_state.page = "upload"
-            st.rerun()
 
     if page == "upload":
         render_upload_page()

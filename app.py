@@ -168,6 +168,32 @@ def inject_global_css():
 
     div[data-testid="stButton"] > button {{ border-radius:10px; }}
 
+    /* Filter tab buttons */
+    .filter-tabs div[data-testid="stButton"] > button {{
+        background: #f9fafc !important;
+        color: #000000 !important;
+        border: 1px solid #e5e7eb !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+    }}
+    .filter-tabs div[data-testid="stButton"] > button:hover {{
+        background: #ffffff !important;
+        color: #000000 !important;
+        border-color: #d1d5db !important;
+    }}
+    .filter-tabs div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {{
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #d1d5db !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+    }}
+    .filter-tabs div[data-testid="stButton"] > button[data-testid="stBaseButton-secondary"] {{
+        background: #f9fafc !important;
+        color: #000000 !important;
+        border: 1px solid #e5e7eb !important;
+        box-shadow: none !important;
+    }}
+
     /* Fix buttons in dark containers */
     .ai-panel div[data-testid="stButton"] > button {{
         background: rgba(255,255,255,0.1) !important;
@@ -340,6 +366,7 @@ def render_candidate_list():
     """, unsafe_allow_html=True)
 
     tabs = ["All"] + STATUS_OPTIONS
+    st.markdown('<div class="filter-tabs">', unsafe_allow_html=True)
     tab_cols = st.columns(len(tabs))
     for i, t in enumerate(tabs):
         with tab_cols[i]:
@@ -347,6 +374,7 @@ def render_candidate_list():
             if st.button(t, key=f"tab_{t}", use_container_width=True, type=btn_type):
                 st.session_state.status_tab = t
                 st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
 

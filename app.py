@@ -168,6 +168,27 @@ def inject_global_css():
 
     div[data-testid="stButton"] > button {{ border-radius:10px; }}
 
+    /* Fix buttons in dark containers */
+    .ai-panel div[data-testid="stButton"] > button {{
+        background: rgba(255,255,255,0.1) !important;
+        color: #e2e8f0 !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+    }}
+    .ai-panel div[data-testid="stButton"] > button:hover {{
+        background: rgba(255,255,255,0.2) !important;
+        color: #ffffff !important;
+    }}
+    .talent-footer div[data-testid="stButton"] > button {{
+        background: rgba(255,255,255,0.08) !important;
+        color: #94a3b8 !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+    }}
+
+    /* Fix Select buttons in candidate cards — ensure readable */
+    div[data-testid="stForm"] div[data-testid="stButton"] > button {{
+        font-size: 11px;
+    }}
+
     /* Upload page */
     .upload-hero {{ text-align:center; padding:48px 0 32px; }}
     .upload-hero-icon {{ width:64px; height:64px; border-radius:18px; background:linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
@@ -235,11 +256,11 @@ def render_header():
         upload_type = "primary" if page == "upload" else "secondary"
         nav1, nav2 = st.columns(2)
         with nav1:
-            if st.button(f"{icon('layers', 14)}  Dashboard", key="nav_dashboard_btn", use_container_width=True, type=dash_type):
+            if st.button("Dashboard", key="nav_dashboard_btn", use_container_width=True, type=dash_type):
                 st.session_state.page = "dashboard"
                 st.rerun()
         with nav2:
-            if st.button(f"{icon('upload', 14)}  Upload", key="nav_upload_btn_header", use_container_width=True, type=upload_type):
+            if st.button("Upload", key="nav_upload_btn_header", use_container_width=True, type=upload_type):
                 st.session_state.page = "upload"
                 st.rerun()
     with user_col:
@@ -265,7 +286,7 @@ def render_header():
                 st.session_state.search_query = query
                 st.rerun()
         with col_add:
-            if st.button(f"{icon('user-plus', 14, 'white')}  Add Candidate", key="open_add_modal", use_container_width=True, type="primary"):
+            if st.button("Add Candidate", key="open_add_modal", use_container_width=True, type="primary"):
                 add_candidate_dialog()
 
 
@@ -487,12 +508,31 @@ def render_profile():
 def get_ai_response(candidate: dict, question: str) -> str:
     if AI_AVAILABLE:
         try:
-            summary = _invoke_with_retry(build_summary_chain(), {"resume_text": " ".join(candidate["skills"])})
-            return summary
+            q_lower = question.lower()
+            jd_text = " ".join(candidate.get("skills", []))
+            resume_text = candidate.get("role", "") + " " + " ".join(candidate.get("skills", []))
+            skill_match = "Matching: " + ", ".join(candidate.get("skills", []))
+            missing = ", ".join(candidate.get("gaps", []))
+
+            if any(w in q_lower for w in ["interview", "question", "ask"]):
+                chain = build_interview_questions_chain()
+                return _invoke_with_retry(chain, {"jd_text": jd_text, "summary": resume_text})
+            elif any(w in q_lower for w in ["score", "match", "rating", "fit"]):
+                chain = build_score_chain()
+                return _invoke_with_retry(chain, {"jd_text": jd_text, "skill_match": skill_match})
+            elif any(w in q_lower for w in ["hire", "recommend", "decision", "hire"]):
+                chain = build_hr_chain()
+                score = str(candidate.get("matchScore", 50))
+                return _invoke_with_retry(chain, {"score": score, "missing_skills": missing, "skill_match": skill_match})
+            else:
+                chain = build_summary_chain()
+                return _invoke_with_retry(chain, {"resume_text": resume_text})
         except Exception as e:
-            return f"Could not retrieve evaluation. Please check your Gemini API key. ({e})"
-    return (f"(Demo mode — no AI chain wired up yet)\n\n"
-            f"Based on {candidate['name']}'s profile, here's a placeholder response to: \"{question}\"")
+            return f"AI analysis failed: {e}"
+    return (f"AI pipeline not connected.\n\n"
+            f"Based on {candidate['name']}'s profile ({candidate['matchScore']}% match):\n"
+            f"Skills: {', '.join(candidate.get('skills', []))}\n"
+            f"Gaps: {', '.join(candidate.get('gaps', []))}")
 
 
 def render_ai_chat():
@@ -832,7 +872,7 @@ def render_upload_page():
 
             st.markdown("<div style='height:12px;'></div>", unsafe_allow_html=True)
 
-            if st.button(f"{icon('zap', 16, 'white')}  Analyze {len(resume_texts)} Candidate{'s' if len(resume_texts) != 1 else ''}", type="primary", use_container_width=True):
+            if st.button(f"Analyze {len(resume_texts)} Candidate{'s' if len(resume_texts) != 1 else ''}", type="primary", use_container_width=True):
                 if not jd_text:
                     st.error("Please upload a Job Description first.")
                 elif not resume_texts:

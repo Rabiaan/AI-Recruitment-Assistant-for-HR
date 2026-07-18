@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from components.uploader import render_uploader
+from components.uploader import render_upload_page
 from components.ranking import render_candidate_list, render_candidate_profile
 from components.ai_chat import render_ai_chat
 from ai.chains import (
@@ -21,6 +21,7 @@ from ai.chains import (
     _invoke_with_retry,
 )
 from utils.parser import CandidateResult, build_candidate_result
+from utils.icons import icon
 
 NOT_FOUND = "Not Found"
 
@@ -31,194 +32,217 @@ MONO_FONT = "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 
 def inject_global_css():
     st.markdown(f"""
     <style>
-    :root {{
-        --slate-950: #020617; --slate-900: #0f172a; --slate-850: #131c2e;
-        --slate-800: #1e293b; --slate-700: #334155; --slate-600: #475569;
-        --slate-500: #64748b; --slate-400: #94a3b8; --slate-300: #cbd5e1;
-        --slate-200: #e2e8f0; --slate-100: #f1f5f9; --slate-50: #f8fafc;
-        --indigo-700: #4338ca; --indigo-600: #4f46e5; --indigo-500: #6366f1;
-        --indigo-400: #818cf8; --indigo-300: #a5b4fc; --indigo-200: #c7d2fe;
-        --indigo-100: #e0e7ff; --indigo-50: #eef2ff;
-        --blue-600: #2563eb; --blue-500: #3b82f6; --blue-100: #dbeafe;
-        --blue-50: #eff6ff;
-        --purple-600: #9333ea; --purple-100: #f3e8ff; --purple-50: #faf5ff;
-        --amber-600: #d97706; --amber-500: #f59e0b; --amber-100: #fef3c7;
-        --amber-50: #fffbeb;
-        --emerald-600: #059669; --emerald-500: #10b981; --emerald-100: #d1fae5;
-        --emerald-50: #ecfdf5;
-        --red-600: #dc2626; --red-100: #fee2e2; --red-50: #fef2f2;
-        --green-600: #16a34a; --green-500: #22c55e;
-    }}
-
+    /* ===== RESET & BASE ===== */
     .stApp {{
         font-family: {SYSTEM_FONT};
-        background: var(--slate-50);
-        color: var(--slate-900);
+        background: #ffffff;
+        color: #0f172a;
     }}
     .stApp header[data-testid="stHeader"] {{ background: transparent; }}
     #MainMenu {{ visibility: hidden; }}
     footer {{ visibility: hidden; }}
     .stDeployButton {{ display: none; }}
+    .block-container {{
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        max-width: 100% !important;
+    }}
+    section[data-testid="stSidebar"] {{ display: none; }}
 
-    /* ===== GLOBAL HEADER ===== */
-    .talent-header {{
-        background: var(--slate-900);
-        border-bottom: 1px solid var(--slate-700);
+    /* ===== VARIABLES ===== */
+    :root {{
+        --bg: #ffffff;
+        --bg-section: #f9fafc;
+        --border: #e5e7eb;
+        --border-light: #f3f4f6;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
+        --indigo-700: #4338ca;
+        --indigo-600: #4f46e5;
+        --indigo-500: #6366f1;
+        --indigo-400: #818cf8;
+        --indigo-100: #e0e7ff;
+        --indigo-50: #eef2ff;
+        --blue-500: #3b82f6;
+        --blue-600: #2563eb;
+        --blue-100: #dbeafe;
+        --blue-50: #eff6ff;
+        --purple-500: #a855f7;
+        --purple-600: #9333ea;
+        --purple-100: #f3e8ff;
+        --purple-50: #faf5ff;
+        --amber-500: #f59e0b;
+        --amber-600: #d97706;
+        --amber-100: #fef3c7;
+        --amber-50: #fffbeb;
+        --emerald-500: #10b981;
+        --emerald-600: #059669;
+        --emerald-100: #d1fae5;
+        --emerald-50: #ecfdf5;
+        --red-500: #ef4444;
+        --red-600: #dc2626;
+        --red-100: #fee2e2;
+        -red-50: #fef2f2;
+    }}
+
+    /* ===== HEADER ===== */
+    .nav-header {{
+        background: #ffffff;
+        border-bottom: 1px solid var(--border);
         padding: 0 24px;
         height: 56px;
         display: flex;
         align-items: center;
-        justify-content: space-between;
         position: sticky;
         top: 0;
         z-index: 999;
-        margin: -1rem -1rem 0 -1rem;
     }}
-    .talent-logo {{
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 220px;
+    .nav-logo {{
+        display: flex; align-items: center; gap: 10px;
+        min-width: 200px; text-decoration: none;
     }}
-    .talent-logo-icon {{
-        width: 32px; height: 32px;
-        border-radius: 8px;
+    .nav-logo-icon {{
+        width: 32px; height: 32px; border-radius: 8px;
         background: linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
         display: flex; align-items: center; justify-content: center;
-        color: white; font-size: 15px;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+        color: white;
     }}
-    .talent-logo-text h1 {{
-        font-size: 15px; font-weight: 700; color: #ffffff;
-        margin: 0; display: flex; align-items: center; gap: 8px;
+    .nav-logo-text {{
+        font-size: 15px; font-weight: 700; color: var(--text-primary);
+        display: flex; align-items: center; gap: 8px;
     }}
-    .talent-badge {{
+    .nav-badge {{
         font-size: 9px; font-weight: 600; padding: 2px 7px;
-        border-radius: 9999px; background: var(--indigo-500);
-        color: white; letter-spacing: 0.5px;
+        border-radius: 9999px; background: var(--indigo-100);
+        color: var(--indigo-600); letter-spacing: 0.5px;
     }}
 
-    /* Search bar */
-    .talent-search {{
-        flex: 1;
-        max-width: 480px;
-        margin: 0 24px;
-        position: relative;
+    /* Nav tabs */
+    .nav-tabs {{
+        display: flex; gap: 4px; margin-left: 32px;
     }}
-    .talent-search input {{
-        width: 100%;
-        background: var(--slate-800);
-        border: 1px solid var(--slate-700);
-        border-radius: 8px;
-        padding: 8px 12px 8px 36px;
-        color: var(--slate-300);
-        font-size: 13px;
-        font-family: {SYSTEM_FONT};
-        outline: none;
+    .nav-tab {{
+        padding: 8px 16px; border-radius: 8px; font-size: 13px;
+        font-weight: 500; color: var(--text-muted); cursor: pointer;
+        border: none; background: transparent; transition: all 0.15s;
+        display: flex; align-items: center; gap: 6px;
+    }}
+    .nav-tab:hover {{ background: var(--bg-section); color: var(--text-secondary); }}
+    .nav-tab.active {{
+        background: var(--indigo-50); color: var(--indigo-600);
+        font-weight: 600;
+    }}
+
+    /* Search */
+    .nav-search {{
+        flex: 1; max-width: 420px; margin: 0 24px; position: relative;
+    }}
+    .nav-search input {{
+        width: 100%; background: var(--bg-section);
+        border: 1px solid var(--border); border-radius: 8px;
+        padding: 8px 12px 8px 36px; color: var(--text-primary);
+        font-size: 13px; font-family: {SYSTEM_FONT}; outline: none;
         transition: border-color 0.15s;
     }}
-    .talent-search input:focus {{ border-color: var(--indigo-500); }}
-    .talent-search input::placeholder {{ color: var(--slate-500); }}
-    .talent-search-icon {{
+    .nav-search input:focus {{ border-color: var(--indigo-500); }}
+    .nav-search input::placeholder {{ color: var(--text-muted); }}
+    .nav-search-icon {{
         position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-        color: var(--slate-500); font-size: 13px;
+        color: var(--text-muted);
     }}
 
-    /* User info */
-    .talent-user {{
+    /* User */
+    .nav-user {{
         display: flex; align-items: center; gap: 10px;
-        min-width: 200px; justify-content: flex-end;
+        margin-left: auto;
     }}
-    .talent-user-info {{ text-align: right; }}
-    .talent-user-email {{ font-size: 11px; font-weight: 600; color: var(--slate-300); }}
-    .talent-user-role {{
-        font-size: 9px; color: var(--indigo-400);
+    .nav-user-info {{ text-align: right; }}
+    .nav-user-email {{ font-size: 11px; font-weight: 600; color: var(--text-primary); }}
+    .nav-user-role {{
+        font-size: 9px; color: var(--indigo-500);
         font-family: {MONO_FONT}; letter-spacing: 1px; text-transform: uppercase;
     }}
-    .talent-avatar {{
+    .nav-avatar {{
         width: 32px; height: 32px; border-radius: 50%;
-        background: var(--indigo-600);
+        background: var(--indigo-600); color: white;
         display: flex; align-items: center; justify-content: center;
-        color: white; font-weight: 700; font-size: 11px;
+        font-weight: 700; font-size: 11px;
     }}
 
     /* ===== STATS BANNER ===== */
-    .stats-banner {{
-        background: var(--slate-900);
-        padding: 12px 24px 16px;
-        border-bottom: 1px solid var(--slate-700);
-        margin: 0 -1rem;
+    .stats-bar {{
+        background: var(--bg); border-bottom: 1px solid var(--border);
+        padding: 16px 24px;
     }}
     .stats-grid {{
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        max-width: 1400px;
-        margin: 0 auto;
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
     }}
     .stat-card {{
-        padding: 14px 16px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        border: 1px solid transparent;
-        transition: transform 0.15s, box-shadow 0.15s;
+        padding: 14px 16px; border-radius: 12px;
+        display: flex; align-items: center; gap: 12px;
+        border: 1px solid transparent; background: var(--bg-section);
     }}
-    .stat-card:hover {{ transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }}
-    .stat-icon {{
+    .stat-icon-wrap {{
         width: 40px; height: 40px; border-radius: 10px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 16px; flex-shrink: 0;
     }}
-    .stat-label {{ font-size: 11px; color: var(--slate-400); font-weight: 500; }}
-    .stat-value {{ font-size: 22px; font-weight: 800; color: white; line-height: 1.2; }}
+    .stat-label {{ font-size: 11px; color: var(--text-muted); font-weight: 500; }}
+    .stat-value {{ font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1.2; }}
 
-    .stat-blue {{ background: rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.15); }}
-    .stat-blue .stat-icon {{ background: rgba(37,99,235,0.15); color: var(--blue-500); }}
-    .stat-purple {{ background: rgba(147,51,234,0.08); border-color: rgba(147,51,234,0.15); }}
-    .stat-purple .stat-icon {{ background: rgba(147,51,234,0.15); color: var(--purple-600); }}
-    .stat-amber {{ background: rgba(217,119,6,0.08); border-color: rgba(217,119,6,0.15); }}
-    .stat-amber .stat-icon {{ background: rgba(217,119,6,0.15); color: var(--amber-500); }}
-    .stat-emerald {{ background: rgba(5,150,105,0.08); border-color: rgba(5,150,105,0.15); }}
-    .stat-emerald .stat-icon {{ background: rgba(5,150,105,0.15); color: var(--emerald-500); }}
+    .stat-blue .stat-icon-wrap {{ background: var(--blue-50); color: var(--blue-500); }}
+    .stat-purple .stat-icon-wrap {{ background: var(--purple-50); color: var(--purple-500); }}
+    .stat-amber .stat-icon-wrap {{ background: var(--amber-50); color: var(--amber-500); }}
+    .stat-emerald .stat-icon-wrap {{ background: var(--emerald-50); color: var(--emerald-500); }}
 
-    /* ===== SECTION LABELS ===== */
+    /* ===== SECTION UTILITIES ===== */
     .section-label {{
         font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px;
-        color: var(--slate-400); font-family: {MONO_FONT}; font-weight: 600;
+        color: var(--text-muted); font-family: {MONO_FONT}; font-weight: 600;
+    }}
+    .section-card {{
+        background: var(--bg-section); border: 1px solid var(--border-light);
+        border-radius: 12px; padding: 16px; margin-bottom: 12px;
+    }}
+
+    /* ===== PIPELINE TABS ===== */
+    .pipeline-tabs {{
+        display: flex; background: var(--bg-section);
+        border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 12px;
+    }}
+    .pipeline-tab {{
+        flex: 1; text-align: center; padding: 7px 4px;
+        border-radius: 8px; font-size: 11px; font-weight: 500;
+        cursor: pointer; border: none; background: transparent;
+        color: var(--text-muted); transition: all 0.15s;
+    }}
+    .pipeline-tab.active {{
+        background: #ffffff; color: var(--text-primary);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }}
 
     /* ===== CANDIDATE CARDS ===== */
     .candidate-card {{
-        padding: 12px 14px;
-        border-radius: 10px;
-        border: 1px solid var(--slate-200);
-        cursor: pointer;
-        transition: all 0.15s;
-        display: flex;
-        align-items: flex-start;
-        gap: 10px;
-        margin-bottom: 6px;
-        background: white;
+        padding: 12px 14px; border-radius: 10px;
+        border: 1px solid var(--border-light); cursor: pointer;
+        transition: all 0.15s; display: flex; align-items: flex-start;
+        gap: 10px; margin-bottom: 6px; background: #ffffff;
     }}
-    .candidate-card:hover {{ background: var(--slate-50); border-color: var(--slate-300); }}
+    .candidate-card:hover {{ border-color: var(--border); }}
     .candidate-card.selected {{
+        border-color: var(--indigo-400);
+        box-shadow: 0 0 0 1px var(--indigo-100);
         background: var(--indigo-50);
-        border-color: var(--indigo-300);
-        box-shadow: 0 0 0 1px var(--indigo-200);
     }}
-
     .initials-badge {{
-        width: 40px; height: 40px; min-width: 40px;
-        border-radius: 10px;
+        width: 40px; height: 40px; min-width: 40px; border-radius: 10px;
         display: flex; align-items: center; justify-content: center;
-        font-weight: 700; font-size: 13px;
-        color: white;
+        font-weight: 700; font-size: 13px; color: white;
     }}
-    .candidate-name {{ font-weight: 600; font-size: 13px; color: var(--slate-900); }}
-    .candidate-title {{ font-size: 11px; color: var(--slate-500); margin-top: 2px; }}
-    .candidate-date {{ font-size: 10px; color: var(--slate-400); margin-top: 4px; font-family: {MONO_FONT}; }}
+    .candidate-name {{ font-weight: 600; font-size: 13px; color: var(--text-primary); }}
+    .candidate-title {{ font-size: 11px; color: var(--text-muted); margin-top: 2px; }}
 
     .score-pill {{
         font-size: 10px; font-weight: 700; padding: 3px 8px;
@@ -233,30 +257,14 @@ def inject_global_css():
         border-radius: 9999px; border: 1px solid; letter-spacing: 0.3px;
         display: inline-block; margin-top: 6px;
     }}
-    .pill-sourced {{ background: var(--slate-100); color: var(--slate-600); border-color: var(--slate-200); }}
+    .pill-sourced {{ background: var(--bg-section); color: var(--text-secondary); border-color: var(--border); }}
     .pill-in-progress {{ background: var(--purple-50); color: var(--purple-600); border-color: #e9d5ff; }}
     .pill-interview {{ background: var(--amber-50); color: var(--amber-600); border-color: #fde68a; }}
     .pill-hired {{ background: var(--emerald-50); color: var(--emerald-600); border-color: #a7f3d0; }}
 
-    /* ===== PIPELINE TABS ===== */
-    .pipeline-tabs {{
-        display: flex; background: var(--slate-100);
-        border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 12px;
-    }}
-    .pipeline-tab {{
-        flex: 1; text-align: center; padding: 7px 4px;
-        border-radius: 8px; font-size: 11px; font-weight: 500;
-        cursor: pointer; border: none; background: transparent;
-        color: var(--slate-500); transition: all 0.15s;
-    }}
-    .pipeline-tab.active {{
-        background: white; color: var(--slate-900);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }}
-
     /* ===== PROFILE ===== */
     .profile-header {{
-        padding: 20px; border-bottom: 1px solid var(--slate-100);
+        padding: 16px 20px; border-bottom: 1px solid var(--border-light);
         display: flex; align-items: center; justify-content: space-between;
     }}
     .profile-avatar-lg {{
@@ -265,25 +273,23 @@ def inject_global_css():
         font-weight: 700; font-size: 16px; color: white;
     }}
     .metric-card {{
-        padding: 14px; background: var(--slate-50);
-        border-radius: 10px; border: 1px solid var(--slate-200);
-        text-align: center;
+        padding: 14px; background: #ffffff; border-radius: 10px;
+        border: 1px solid var(--border-light); text-align: center;
     }}
     .metric-label {{
         font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px;
-        color: var(--slate-400); font-family: {MONO_FONT}; font-weight: 600;
+        color: var(--text-muted); font-family: {MONO_FONT}; font-weight: 600;
     }}
-    .metric-value {{ font-size: 18px; font-weight: 800; color: var(--slate-900); margin-top: 4px; }}
+    .metric-value {{ font-size: 18px; font-weight: 800; color: var(--text-primary); margin-top: 4px; }}
 
     /* ===== SKILL TAGS ===== */
     .skill-tag {{
-        display: inline-block; padding: 4px 10px;
-        border-radius: 6px; font-size: 11px; font-weight: 500;
-        margin: 3px; border: 1px solid transparent;
+        display: inline-block; padding: 5px 12px; border-radius: 6px;
+        font-size: 12px; font-weight: 500; margin: 3px;
     }}
-    .tag-match {{ background: var(--emerald-50); color: var(--emerald-600); border-color: #a7f3d0; }}
-    .tag-miss {{ background: var(--red-50); color: var(--red-600); border-color: #fecaca; }}
-    .tag-extra {{ background: var(--blue-50); color: var(--blue-600); border-color: #bfdbfe; }}
+    .tag-match {{ background: var(--emerald-50); color: var(--emerald-600); border: 1px solid #a7f3d0; }}
+    .tag-miss {{ background: var(--red-50); color: var(--red-600); border: 1px solid #fecaca; }}
+    .tag-extra {{ background: var(--blue-50); color: var(--blue-600); border: 1px solid #bfdbfe; }}
 
     /* ===== STRENGTHS / GAPS ===== */
     .strengths-card {{
@@ -294,10 +300,7 @@ def inject_global_css():
         background: var(--red-50); border: 1px solid #fecaca;
         border-radius: 10px; padding: 14px;
     }}
-    .card-title {{
-        font-size: 11px; font-weight: 600; display: flex;
-        align-items: center; gap: 6px; margin-bottom: 8px;
-    }}
+    .card-title {{ font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }}
 
     /* ===== TIMELINE ===== */
     .tl-item {{ position: relative; padding-left: 28px; margin-bottom: 20px; }}
@@ -308,105 +311,138 @@ def inject_global_css():
     }}
     .tl-line {{
         position: absolute; left: 10px; top: 20px;
-        bottom: -12px; width: 1px; background: var(--slate-200);
+        bottom: -12px; width: 1px; background: var(--border);
     }}
     .tl-meta {{
-        font-size: 10px; color: var(--slate-400);
-        font-family: {MONO_FONT};
-        display: flex; justify-content: space-between;
+        font-size: 10px; color: var(--text-muted);
+        font-family: {MONO_FONT}; display: flex; justify-content: space-between;
     }}
-    .tl-role {{ font-size: 13px; font-weight: 700; color: var(--slate-900); margin-top: 2px; }}
-    .tl-desc {{ font-size: 11px; color: var(--slate-600); margin-top: 4px; line-height: 1.5; }}
+    .tl-role {{ font-size: 13px; font-weight: 700; color: var(--text-primary); margin-top: 2px; }}
+    .tl-desc {{ font-size: 11px; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }}
 
     /* ===== PROGRESS BAR ===== */
     .pref-bar-bg {{
         width: 100%; height: 10px; border-radius: 9999px;
-        background: var(--slate-100); overflow: hidden;
-        display: flex; margin-top: 6px;
+        background: var(--border-light); overflow: hidden; display: flex;
     }}
-    .pref-bar-fill {{ height: 100%; transition: width 0.3s; }}
+    .pref-bar-fill {{ height: 100%; }}
     .pref-legend {{ display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }}
-    .pref-legend-item {{ display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--slate-600); }}
+    .pref-legend-item {{ display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text-secondary); }}
     .pref-dot {{ width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }}
-
-    /* ===== RADIAL GAUGE ===== */
-    .gauge-container {{ text-align: center; }}
-    .gauge-label {{ font-size: 10px; color: var(--slate-500); margin-top: 4px; font-family: {MONO_FONT}; }}
 
     /* ===== AI CHAT ===== */
     .ai-panel {{
-        background: var(--slate-900); color: var(--slate-300);
-        border-radius: 14px; padding: 16px; border: 1px solid var(--slate-700);
+        background: #0f172a; color: #e2e8f0;
+        border-radius: 14px; padding: 16px; border: 1px solid #1e293b;
     }}
     .ai-header {{
         display: flex; align-items: center; justify-content: space-between;
-        padding-bottom: 12px; border-bottom: 1px solid var(--slate-800);
+        padding-bottom: 12px; border-bottom: 1px solid #1e293b;
         margin-bottom: 12px;
     }}
     .ai-msg-user {{
         background: var(--indigo-600); color: white;
-        border-radius: 12px 12px 4px 12px;
-        padding: 10px 12px; max-width: 90%; font-size: 12px;
+        border-radius: 12px 12px 4px 12px; padding: 10px 12px;
+        max-width: 90%; font-size: 12px;
     }}
     .ai-msg-ai {{
-        background: var(--slate-800); color: var(--slate-300);
-        border-radius: 12px 12px 12px 4px;
-        padding: 10px 12px; max-width: 90%; font-size: 12px;
-        border: 1px solid var(--slate-700);
+        background: #1e293b; color: #e2e8f0;
+        border-radius: 12px 12px 12px 4px; padding: 10px 12px;
+        max-width: 90%; font-size: 12px; border: 1px solid #334155;
     }}
-    .ai-preset {{
-        background: var(--slate-800); border: 1px solid var(--slate-700);
-        border-radius: 8px; padding: 8px 10px; font-size: 10px;
-        color: var(--slate-300); cursor: pointer; width: 100%;
-        margin-bottom: 4px; text-align: left; transition: background 0.15s;
-    }}
-    .ai-preset:hover {{ background: var(--slate-700); }}
 
-    /* ===== SCHEDULE CARD ===== */
-    .schedule-card {{
-        background: white; border: 1px solid var(--slate-200);
-        border-radius: 12px; padding: 14px; margin-bottom: 8px;
+    /* ===== CALENDAR ===== */
+    .cal-card {{
+        background: #ffffff; border: 1px solid var(--border);
+        border-radius: 28px; padding: 22px 20px 18px;
+        box-shadow: 0 20px 40px -12px rgba(20,20,40,0.08);
     }}
-    .schedule-time {{
-        font-size: 11px; font-weight: 700; color: var(--indigo-600);
-        font-family: {MONO_FONT};
+    .cal-header {{
+        display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
     }}
-    .schedule-title {{ font-size: 12px; font-weight: 600; color: var(--slate-900); margin-top: 4px; }}
-    .schedule-meta {{ font-size: 10px; color: var(--slate-500); margin-top: 2px; }}
-    .schedule-type {{
-        font-size: 9px; font-weight: 600; padding: 2px 6px;
-        border-radius: 4px; display: inline-block; margin-top: 6px;
+    .cal-header .month {{ font-size: 15px; font-weight: 600; color: var(--text-primary); }}
+    .cal-nav {{
+        width: 26px; height: 26px; border-radius: 50%; border: none;
+        background: transparent; color: #c7cbd3; font-size: 16px;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
     }}
-    .type-interview {{ background: var(--amber-100); color: var(--amber-600); }}
-    .type-1on1 {{ background: var(--blue-100); color: var(--blue-600); }}
+    .cal-nav:hover {{ background: #f0f1f4; color: #a6acb8; }}
+    .cal-weekdays {{
+        display: grid; grid-template-columns: repeat(7, 1fr);
+        text-align: center; font-size: 11px; color: #c7cbd3;
+        font-weight: 600; margin-bottom: 6px;
+    }}
+    .cal-days {{ display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 6px; }}
+    .cal-day {{
+        position: relative; height: 34px; display: flex; align-items: center;
+        justify-content: center; font-size: 13px; color: var(--text-primary);
+    }}
+    .cal-day.muted {{ color: #c7cbd3; }}
+    .cal-day.weekend {{ color: #ff5a6e; }}
+    .cal-day.weekend.muted {{ color: #f3c3c9; }}
+    .cal-day.today {{
+        background: #3f6bff; color: white; border-radius: 50%;
+        width: 30px; height: 30px; font-weight: 600;
+    }}
+    .cal-day .dot {{
+        position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+        width: 3px; height: 3px; border-radius: 50%; background: #3f6bff;
+        box-shadow: 5px 0 0 #3f6bff, -5px 0 0 #3f6bff;
+    }}
+
+    /* Agenda */
+    .cal-agenda {{ margin-top: 18px; padding-top: 16px; border-top: 1px solid #f0f1f4; display: flex; flex-direction: column; gap: 14px; }}
+    .cal-event {{ display: flex; align-items: center; gap: 12px; }}
+    .cal-bar {{ width: 3px; align-self: stretch; border-radius: 2px; flex-shrink: 0; }}
+    .cal-bar.orange {{ background: #f5a623; }}
+    .cal-bar.green {{ background: #3ecf8e; }}
+    .cal-bar.blue {{ background: #3f6bff; }}
+    .cal-bar.red {{ background: #ff5a6e; }}
+    .cal-datetime {{ width: 56px; flex-shrink: 0; font-size: 11px; line-height: 1.4; color: #c7cbd3; font-weight: 600; }}
+    .cal-info {{ flex: 1; min-width: 0; }}
+    .cal-event-role {{ font-size: 11px; color: #a6acb8; margin-bottom: 2px; }}
+    .cal-event-title {{ font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+    .cal-call-icon {{
+        width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+    }}
+    .cal-call-icon.meet {{ background: #eaf6ec; }}
+    .cal-call-icon.zoom {{ background: #e8effe; }}
+    .cal-call-icon svg {{ width: 15px; height: 15px; }}
+
+    /* ===== UPLOAD PAGE ===== */
+    .upload-page {{
+        min-height: 100vh; background: var(--bg-section);
+        display: flex; align-items: center; justify-content: center;
+        padding: 40px 24px;
+    }}
+    .upload-card {{
+        background: white; border-radius: 20px; padding: 40px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+        max-width: 800px; width: 100%;
+    }}
 
     /* ===== FOOTER ===== */
     .talent-footer {{
-        background: var(--slate-950); color: var(--slate-600);
-        padding: 20px 24px; border-top: 1px solid var(--slate-800);
+        background: #020617; color: #475569;
+        padding: 20px 24px; border-top: 1px solid #1e293b;
         font-size: 10px; font-family: {MONO_FONT};
-        margin: 2rem -1rem -1rem -1rem;
     }}
 
     /* ===== EMPTY STATE ===== */
-    .empty-state {{ text-align: center; padding: 40px; color: var(--slate-400); }}
+    .empty-state {{ text-align: center; padding: 40px; color: var(--text-muted); }}
 
-    /* ===== SIDEBAR ===== */
-    [data-testid="stSidebar"] {{ background: var(--slate-50); }}
-    [data-testid="stSidebar"] .stMarkdown h3 {{ color: var(--indigo-600); }}
-
-    /* ===== ANIMATIONS ===== */
     @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.4; }} }}
     .pulse-dot {{
         width: 6px; height: 6px; border-radius: 50%;
-        background: var(--green-500);
-        animation: pulse 2s infinite; display: inline-block;
+        background: var(--emerald-500); animation: pulse 2s infinite;
+        display: inline-block;
     }}
 
-    /* ===== COLUMN PADDING ===== */
-    .col-left {{ padding-right: 8px; }}
-    .col-mid {{ padding: 0 8px; }}
-    .col-right {{ padding-left: 8px; }}
+    /* Hide Streamlit elements */
+    [data-testid="stToolbar"] {{ display: none; }}
+    [data-testid="stDecoration"] {{ display: none; }}
+    div[data-testid="stStatusWidget"] {{ display: none; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -464,74 +500,62 @@ def export_csv(results: list[CandidateResult]) -> tuple[bytes, str]:
     return csv_bytes, filename
 
 
-BADGE_COLORS = [
-    "#4f46e5", "#7c3aed", "#2563eb", "#0891b2", "#059669",
-    "#d97706", "#dc2626", "#c026d3", "#0d9488", "#6366f1",
-]
+def render_header():
+    page = st.session_state.get("page", "dashboard")
+    upload_active = "active" if page == "upload" else ""
+    dash_active = "active" if page == "dashboard" else ""
 
-
-def get_badge_color(name: str) -> str:
-    h = sum(ord(c) for c in name)
-    return BADGE_COLORS[h % len(BADGE_COLORS)]
-
-
-def get_initials(name: str) -> str:
-    parts = name.strip().split()
-    if len(parts) >= 2:
-        return (parts[0][0] + parts[1][0]).upper()
-    return name[:2].upper() if name else "?"
-
-
-def main():
-    st.set_page_config(page_title="TalentAI — HR Intelligence", page_icon=":sparkles:", layout="wide")
-    inject_global_css()
-
-    if "results" not in st.session_state:
-        st.session_state.results = []
-    if "selected_idx" not in st.session_state:
-        st.session_state.selected_idx = 0
-    if "status_tab" not in st.session_state:
-        st.session_state.status_tab = "All"
-    if "search_query" not in st.session_state:
-        st.session_state.search_query = ""
-    if "header_search" not in st.session_state:
-        st.session_state.header_search = ""
-
-    # ========== HEADER ==========
-    search_val = st.session_state.header_search
+    search_val = st.session_state.get("header_search", "")
     st.markdown(f"""
-    <div class="talent-header">
-        <div class="talent-logo">
-            <div class="talent-logo-icon">&#10024;</div>
-            <div class="talent-logo-text">
-                <h1>TalentAI <span class="talent-badge">RECRUIT</span></h1>
-            </div>
+    <div class="nav-header">
+        <div class="nav-logo">
+            <div class="nav-logo-icon">{icon("sparkles", 16, "white")}</div>
+            <div class="nav-logo-text">TalentAI <span class="nav-badge">RECRUIT</span></div>
         </div>
-        <div class="talent-search">
-            <span class="talent-search-icon">&#128269;</span>
-            <input type="text" placeholder="Search candidates by name, title, or skill..." value="{search_val}" />
+        <div class="nav-tabs">
+            <button class="nav-tab {dash_active}" id="nav_dash">
+                {icon("home", 14)} Dashboard
+            </button>
+            <button class="nav-tab {upload_active}" id="nav_upload">
+                {icon("upload", 14)} Upload
+            </button>
         </div>
-        <div class="talent-user">
-            <div class="talent-user-info">
-                <div class="talent-user-email">syedrabiaan@gmail.com</div>
-                <div class="talent-user-role">Recruiting Manager</div>
+        <div class="nav-search">
+            <span class="nav-search-icon">{icon("search", 14)}</span>
+            <input type="text" placeholder="Search by name, title, or skill..." value="{search_val}" />
+        </div>
+        <div class="nav-user">
+            <div class="nav-user-info">
+                <div class="nav-user-email">syedrabiaan@gmail.com</div>
+                <div class="nav-user-role">Recruiting Manager</div>
             </div>
-            <div class="talent-avatar">SR</div>
+            <div class="nav-avatar">SR</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    header_search = st.text_input(
-        "Search", placeholder="Search candidates...",
-        label_visibility="collapsed", key="header_search_input",
+    nav_cols = st.columns([1, 1, 5, 2])
+    with nav_cols[0]:
+        if st.button("Dashboard", key="nav_btn_dash", use_container_width=True):
+            st.session_state.page = "dashboard"
+            st.rerun()
+    with nav_cols[1]:
+        if st.button("Upload", key="nav_btn_upload", use_container_width=True):
+            st.session_state.page = "upload"
+            st.rerun()
+
+    search_input = st.text_input(
+        "Search", label_visibility="collapsed", key="header_search_widget",
+        placeholder="Search candidates...", value=search_val,
     )
-    if header_search != st.session_state.header_search:
-        st.session_state.header_search = header_search
-        st.session_state.search_query = header_search
+    if search_input != st.session_state.get("header_search", ""):
+        st.session_state.header_search = search_input
+        st.session_state.search_query = search_input
         st.session_state.selected_idx = 0
         st.rerun()
 
-    # ========== STATS BANNER ==========
+
+def render_stats():
     counts = {"Sourced": 0, "In Progress": 0, "Interview": 0, "Hired": 0}
     try:
         from ai.db import get_status_counts
@@ -550,115 +574,145 @@ def main():
                     counts["In Progress"] += 1
 
     st.markdown(f"""
-    <div class="stats-banner">
+    <div class="stats-bar">
         <div class="stats-grid">
             <div class="stat-card stat-blue">
-                <div class="stat-icon">&#128203;</div>
+                <div class="stat-icon-wrap">{icon("inbox", 18, "#3b82f6")}</div>
                 <div><div class="stat-label">Sourced</div><div class="stat-value">{counts.get("Sourced", 0)}</div></div>
             </div>
             <div class="stat-card stat-purple">
-                <div class="stat-icon">&#128200;</div>
+                <div class="stat-icon-wrap">{icon("trending-up", 18, "#a855f7")}</div>
                 <div><div class="stat-label">In Progress</div><div class="stat-value">{counts.get("In Progress", 0)}</div></div>
             </div>
             <div class="stat-card stat-amber">
-                <div class="stat-icon">&#128197;</div>
+                <div class="stat-icon-wrap">{icon("calendar", 18, "#f59e0b")}</div>
                 <div><div class="stat-label">Interviews Scheduled</div><div class="stat-value">{counts.get("Interview", 0)}</div></div>
             </div>
             <div class="stat-card stat-emerald">
-                <div class="stat-icon">&#9989;</div>
+                <div class="stat-icon-wrap">{icon("check-circle", 18, "#10b981")}</div>
                 <div><div class="stat-label">Hired / Offered</div><div class="stat-value">{counts.get("Hired", 0)}</div></div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ========== UPLOAD SECTION ==========
-    st.markdown("")
-    jd_text, resume_tuples = render_uploader()
 
-    if jd_text and resume_tuples:
-        analyze_clicked = st.button("Analyze Resumes", type="primary", use_container_width=True)
-        if analyze_clicked:
-            resume_map = {name: text for name, text in resume_tuples}
-            results: list[CandidateResult] = []
-            progress = st.progress(0.0, text="Starting analysis...")
-            status_box = st.empty()
-            for idx, (name, text) in enumerate(resume_tuples):
-                status_box.info(f"Analyzing **{name}** ({idx + 1}/{len(resume_tuples)})...")
-                result = analyze_resume(name, text, jd_text)
-                results.append(result)
-                progress.progress((idx + 1) / len(resume_tuples), text=f"Completed {idx + 1}/{len(resume_tuples)}")
-            status_box.success(f"Analysis complete — {len(results)} candidates processed.")
-            st.session_state.results = [r.model_dump() for r in results]
-            st.session_state.selected_idx = 0
-            try:
-                from ai.db import insert_job_description
-                jd_row = insert_job_description(title=resume_tuples[0][0], raw_text=jd_text)
-                persist_to_supabase(jd_row["id"], results, resume_map)
-            except Exception:
-                pass
-            st.rerun()
+def render_dashboard():
+    all_candidates = list(st.session_state.results)
+    try:
+        from ai.db import fetch_history
+        db_history = fetch_history(limit=100)
+        if db_history:
+            seen = {c["candidate_name"] for c in all_candidates}
+            for db_c in db_history:
+                if db_c["candidate_name"] not in seen:
+                    all_candidates.append(db_c)
+                    seen.add(db_c["candidate_name"])
+    except Exception:
+        pass
 
-    # ========== 3-COLUMN LAYOUT ==========
-    if st.session_state.results:
-        st.markdown('<div style="height: 12px;"></div>', unsafe_allow_html=True)
+    query = st.session_state.get("search_query", "").lower()
+    tab = st.session_state.get("status_tab", "All")
+    filtered = all_candidates
+    if tab != "All":
+        filtered = [c for c in filtered if c.get("status", "Sourced") == tab]
+    if query:
+        filtered = [c for c in filtered if query in c.get("candidate_name", "").lower() or query in c.get("summary", "").lower() or query in " ".join(c.get("matching_skills", []) or []).lower()]
 
-        all_candidates = list(st.session_state.results)
-        try:
-            from ai.db import fetch_history
-            db_history = fetch_history(limit=100)
-            if db_history:
-                seen_names = {c["candidate_name"] for c in all_candidates}
-                for db_c in db_history:
-                    if db_c["candidate_name"] not in seen_names:
-                        all_candidates.append(db_c)
-                        seen_names.add(db_c["candidate_name"])
-        except Exception:
-            pass
+    col_list, col_profile, col_chat = st.columns([4, 5, 3])
 
-        query = st.session_state.get("header_search", "").lower() or st.session_state.get("search_query", "").lower()
-        tab = st.session_state.get("status_tab", "All")
-        filtered = all_candidates
-        if tab != "All":
-            filtered = [c for c in filtered if c.get("status", "Sourced") == tab]
-        if query:
-            filtered = [c for c in filtered if query in c.get("candidate_name", "").lower() or query in c.get("summary", "").lower() or query in " ".join(c.get("matching_skills", []) or []).lower()]
+    with col_list:
+        render_candidate_list(filtered, all_candidates)
 
-        col_list, col_profile, col_chat = st.columns([4, 5, 3])
+    with col_profile:
+        if filtered:
+            sel_idx = min(st.session_state.selected_idx, len(filtered) - 1)
+            render_candidate_profile(filtered[sel_idx])
+        else:
+            st.markdown(f"""
+            <div class="empty-state" style="padding:80px 16px;">
+                {icon("users", 48, "#94a3b8")}
+                <p style="font-weight:600;color:#64748b;margin:12px 0 0 0;">No candidates found</p>
+                <p style="font-size:11px;color:#94a3b8;margin:4px 0 0 0;">Upload resumes to get started.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        with col_list:
-            render_candidate_list(filtered, all_candidates)
+    with col_chat:
+        if filtered:
+            sel_idx = min(st.session_state.selected_idx, len(filtered) - 1)
+            render_ai_chat(filtered[sel_idx])
+        else:
+            st.markdown(f"""
+            <div class="empty-state" style="padding:40px 16px;">
+                {icon("message-square", 24, "#94a3b8")}
+                <p style="font-size:11px;color:#94a3b8;margin:8px 0 0 0;">Select a candidate to activate the AI Co-Pilot.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        with col_profile:
-            if filtered:
-                sel_idx = min(st.session_state.selected_idx, len(filtered) - 1)
-                render_candidate_profile(filtered[sel_idx])
-            else:
-                st.markdown('<div class="empty-state" style="padding:80px 16px;"><p style="font-size:48px;margin:0;">&#128100;</p><p style="font-weight:600;color:var(--slate-500);margin:12px 0 0 0;">No candidates match your filters</p><p style="font-size:11px;color:var(--slate-400);margin:4px 0 0 0;">Try a different search or pipeline tab.</p></div>', unsafe_allow_html=True)
 
-        with col_chat:
-            if filtered:
-                sel_idx = min(st.session_state.selected_idx, len(filtered) - 1)
-                render_ai_chat(filtered[sel_idx])
-            else:
-                st.markdown('<div class="empty-state" style="padding:40px 16px;"><p style="font-size:11px;color:var(--slate-400);">Select a candidate to activate the AI Co-Pilot.</p></div>', unsafe_allow_html=True)
+def main():
+    st.set_page_config(page_title="TalentAI", page_icon=None, layout="wide")
+    inject_global_css()
 
-    # ========== FOOTER ==========
+    for key, default in [("results", []), ("selected_idx", 0), ("status_tab", "All"),
+                          ("search_query", ""), ("header_search", ""), ("page", "dashboard")]:
+        if key not in st.session_state:
+            st.session_state[key] = default
+
+    render_header()
+
+    page = st.session_state.page
+
+    if page == "upload":
+        jd_text, resume_tuples = render_upload_page()
+        if jd_text and resume_tuples:
+            analyze_clicked = st.button("Analyze Resumes", type="primary", use_container_width=True)
+            if analyze_clicked:
+                resume_map = {name: text for name, text in resume_tuples}
+                results: list[CandidateResult] = []
+                progress = st.progress(0.0, text="Starting analysis...")
+                status_box = st.empty()
+                for idx, (name, text) in enumerate(resume_tuples):
+                    status_box.info(f"Analyzing **{name}** ({idx + 1}/{len(resume_tuples)})...")
+                    result = analyze_resume(name, text, jd_text)
+                    results.append(result)
+                    progress.progress((idx + 1) / len(resume_tuples), text=f"Completed {idx + 1}/{len(resume_tuples)}")
+                status_box.success(f"Analysis complete — {len(results)} candidates processed.")
+                st.session_state.results = [r.model_dump() for r in results]
+                st.session_state.selected_idx = 0
+                try:
+                    from ai.db import insert_job_description
+                    jd_row = insert_job_description(title=resume_tuples[0][0], raw_text=jd_text)
+                    persist_to_supabase(jd_row["id"], results, resume_map)
+                except Exception:
+                    pass
+                st.session_state.page = "dashboard"
+                st.rerun()
+    else:
+        if st.session_state.results:
+            render_stats()
+            render_dashboard()
+        else:
+            st.markdown(f"""
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+                        min-height:60vh;gap:16px;color:#94a3b8;">
+                {icon("upload", 48, "#cbd5e1")}
+                <p style="font-size:16px;font-weight:600;color:#475569;margin:0;">No data yet</p>
+                <p style="font-size:13px;color:#94a3b8;margin:0;">Upload a Job Description and Resumes to begin analysis.</p>
+            </div>
+            """, unsafe_allow_html=True)
+
     st.markdown("""
     <div class="talent-footer">
-        <div style="max-width:1400px; margin:0 auto; display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
-                <p style="color:var(--slate-300); font-weight:700; font-size:11px; margin:0;">TalentAI HR Intelligence Engine &copy; 2026</p>
-                <p style="font-size:10px; color:var(--slate-600); margin-top:3px;">Configured for syedrabiaan@gmail.com | SMIT Batch 9</p>
+                <p style="color:#e2e8f0;font-weight:700;font-size:11px;margin:0;">TalentAI HR Intelligence Engine</p>
+                <p style="font-size:10px;color:#475569;margin-top:3px;">SMIT Batch 9 | syedrabiaan@gmail.com</p>
             </div>
-            <div style="display:flex; gap:16px; align-items:center;">
-                <span style="display:flex; align-items:center; gap:5px;">
+            <div style="display:flex;gap:16px;align-items:center;">
+                <span style="display:flex;align-items:center;gap:5px;">
                     <span class="pulse-dot"></span>
-                    <span style="color:var(--slate-400);">Server Active</span>
-                </span>
-                <span style="display:flex; align-items:center; gap:5px;">
-                    <span class="pulse-dot"></span>
-                    <span style="color:var(--slate-400);">Supabase Connected</span>
+                    <span style="color:#94a3b8;">Server Active</span>
                 </span>
             </div>
         </div>

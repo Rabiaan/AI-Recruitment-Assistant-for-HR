@@ -8,11 +8,22 @@ load_dotenv()
 _client: Client | None = None
 
 
+def _get_env(name: str) -> str | None:
+    val = os.getenv(name)
+    if val:
+        return val
+    try:
+        import streamlit as st
+        return st.secrets.get(name, None)
+    except Exception:
+        return None
+
+
 def get_client() -> Client:
     global _client
     if _client is None:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
+        url = _get_env("SUPABASE_URL")
+        key = _get_env("SUPABASE_KEY")
         if not url or not key:
             raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set.")
         _client = create_client(url, key)

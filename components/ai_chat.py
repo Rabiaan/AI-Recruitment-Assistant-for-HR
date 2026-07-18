@@ -67,12 +67,12 @@ def render_ai_chat(cand: dict):
                 <div style="width:28px;height:28px;border-radius:8px;background:#4f46e5;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">&#10024;</div>
                 <div>
                     <div style="font-size:12px;font-weight:700;">AI Co-Recruiter</div>
-                    <div style="font-size:9px;color:#64748b;font-family:'JetBrains Mono',monospace;">Gemini Flash Active</div>
+                    <div style="font-size:9px;color:#64748b;font-family:ui-monospace,'Cascadia Code','Source Code Pro',Menlo,Consolas,monospace;">Gemini Flash Active</div>
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:4px;">
                 <span style="width:6px;height:6px;border-radius:50%;background:#10b981;animation:pulse 2s infinite;"></span>
-                <span style="font-size:9px;color:#64748b;font-family:'JetBrains Mono',monospace;">LIVE</span>
+                <span style="font-size:9px;color:#64748b;font-family:ui-monospace,'Cascadia Code','Source Code Pro',Menlo,Consolas,monospace;">LIVE</span>
             </div>
         </div>
     """, unsafe_allow_html=True)

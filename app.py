@@ -27,11 +27,9 @@ NOT_FOUND = "Not Found"
 
 def inject_global_css():
     st.markdown("""
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
     /* Global */
-    .stApp { font-family: 'Inter', sans-serif; background: #f8fafc; }
+    .stApp { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
     .stApp header[data-testid="stHeader"] { background: #f8fafc; }
 
     /* Header */
@@ -83,7 +81,7 @@ def inject_global_css():
     .talent-subtitle {
         font-size: 11px;
         color: #94a3b8;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
         margin: 0;
     }
     .talent-user {
@@ -93,7 +91,7 @@ def inject_global_css():
         text-align: right;
     }
     .talent-user-name { font-size: 11px; font-weight: 700; color: #1e293b; }
-    .talent-user-role { font-size: 9px; color: #4f46e5; font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; }
+    .talent-user-role { font-size: 9px; color: #4f46e5; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; letter-spacing: 1px; }
     .talent-avatar {
         width: 36px; height: 36px;
         border-radius: 50%;
@@ -164,7 +162,7 @@ def inject_global_css():
     .candidate-name { font-weight: 600; font-size: 13px; color: #1e293b; }
     .candidate-role { font-size: 11px; color: #94a3b8; margin-top: 2px; }
     .candidate-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
-    .score-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; }
+    .score-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; }
     .score-high { background: #d1fae5; color: #065f46; }
     .score-mid { background: #fef3c7; color: #92400e; }
     .score-low { background: #fee2e2; color: #991b1b; }
@@ -195,7 +193,7 @@ def inject_global_css():
         border: 1px solid #f1f5f9;
         text-align: center;
     }
-    .profile-metric-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; }
+    .profile-metric-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; }
     .profile-metric-value { font-size: 14px; font-weight: 700; color: #1e293b; margin-top: 4px; }
 
     /* Skill badges */
@@ -220,7 +218,7 @@ def inject_global_css():
     .timeline-item { position: relative; padding-left: 24px; margin-bottom: 16px; }
     .timeline-dot { position: absolute; left: 7px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: #4f46e5; }
     .timeline-line { position: absolute; left: 10px; top: 16px; bottom: -8px; width: 1px; background: #e2e8f0; }
-    .timeline-company { font-size: 10px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; display: flex; justify-content: space-between; }
+    .timeline-company { font-size: 10px; color: #94a3b8; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; display: flex; justify-content: space-between; }
     .timeline-role { font-size: 12px; font-weight: 700; color: #1e293b; }
     .timeline-desc { font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.5; }
 
@@ -241,12 +239,12 @@ def inject_global_css():
     .talent-footer {
         background: #020617; color: #475569; padding: 24px;
         border-top: 1px solid #1e293b;
-        font-size: 11px; font-family: 'JetBrains Mono', monospace;
+        font-size: 11px; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
         margin: 2rem -1rem -1rem -1rem;
     }
 
     /* Section labels */
-    .section-mono { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .section-mono { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace; font-weight: 600; }
 
     /* Empty state */
     .empty-state { text-align: center; padding: 40px; color: #94a3b8; }

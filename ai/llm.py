@@ -5,14 +5,25 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _get_env(name: str) -> str | None:
+    val = os.getenv(name)
+    if val:
+        return val
+    try:
+        import streamlit as st
+        return st.secrets.get(name, None)
+    except Exception:
+        return None
+
+
 def get_llm(temperature: float = 0.2) -> ChatGoogleGenerativeAI:
-    api_key = os.getenv("GOOGLE_API_KEY")
+    api_key = _get_env("GOOGLE_API_KEY")
     if not api_key:
         raise ValueError(
-            "GOOGLE_API_KEY not found in environment variables. Check your .env file."
+            "GOOGLE_API_KEY not found. Set it in .env (local) or Streamlit Cloud Secrets."
         )
 
-    model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    model = _get_env("GEMINI_MODEL") or "gemini-2.0-flash"
 
     return ChatGoogleGenerativeAI(
         model=model,

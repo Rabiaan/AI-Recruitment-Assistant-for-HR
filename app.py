@@ -257,22 +257,36 @@ def inject_global_css():
     }}
 
     /* Upload page */
-    .upload-hero {{ text-align:center; padding:48px 0 32px; }}
-    .upload-hero-icon {{ width:64px; height:64px; border-radius:18px; background:linear-gradient(135deg, var(--indigo-500), var(--indigo-700));
+    .upload-hero {{ text-align:center; padding:48px 0 32px !important; background: #ffffff !important; }}
+    .upload-hero-icon {{ width:64px; height:64px; border-radius:18px; background:linear-gradient(135deg, var(--indigo-500), var(--indigo-700)) !important;
         display:inline-flex; align-items:center; justify-content:center; margin-bottom:16px; }}
-    .upload-hero h2 {{ font-size:22px; font-weight:800; color:var(--text-primary); margin:0; }}
-    .upload-hero p {{ font-size:13px; color:var(--text-muted); margin:6px 0 0; }}
-    .upload-zone {{ background:#fff; border:2px dashed var(--border); border-radius:16px; padding:32px; text-align:center;
+    .upload-hero h2 {{ font-size:22px; font-weight:800; color:var(--text-primary) !important; margin:0; }}
+    .upload-hero p {{ font-size:13px; color:var(--text-muted) !important; margin:6px 0 0; }}
+    .upload-zone {{ background:#ffffff !important; border:2px dashed var(--border) !important; border-radius:16px; padding:32px; text-align:center;
         transition:border-color 0.2s, background 0.2s; cursor:pointer; }}
-    .upload-zone:hover {{ border-color:var(--indigo-400); background:var(--indigo-50); }}
-    .upload-zone-label {{ font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:4px; }}
-    .upload-zone-hint {{ font-size:11px; color:var(--text-muted); }}
-    .upload-file-row {{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg-section);
-        border-radius:10px; margin-bottom:6px; border:1px solid var(--border-light); }}
-    .upload-file-name {{ font-size:12px; font-weight:600; color:var(--text-primary); flex:1; }}
-    .upload-file-size {{ font-size:10px; color:var(--text-muted); font-family:{MONO_FONT}; }}
-    .upload-section-title {{ font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted);
+    .upload-zone:hover {{ border-color:var(--indigo-400) !important; background:var(--indigo-50) !important; }}
+    .upload-zone-label {{ font-size:13px; font-weight:600; color:var(--text-primary) !important; margin-bottom:4px; }}
+    .upload-zone-hint {{ font-size:11px; color:var(--text-muted) !important; }}
+    .upload-file-row {{ display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--bg-section) !important;
+        border-radius:10px; margin-bottom:6px; border:1px solid var(--border-light) !important; }}
+    .upload-file-name {{ font-size:12px; font-weight:600; color:var(--text-primary) !important; flex:1; }}
+    .upload-file-size {{ font-size:10px; color:var(--text-muted) !important; font-family:{MONO_FONT}; }}
+    .upload-section-title {{ font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-muted) !important;
         font-family:{MONO_FONT}; font-weight:600; margin-bottom:10px; display:flex; align-items:center; gap:6px; }}
+
+    /* Upload page — force all widgets white */
+    [data-testid="stVerticalBlock"] div[data-testid="stFileUploader"] {{ background:#ffffff !important; border:2px dashed #d1d5db !important; border-radius:16px !important; padding:24px !important; }}
+    [data-testid="stVerticalBlock"] div[data-testid="stFileUploader"] label {{ color:#334155 !important; font-weight:600 !important; }}
+    [data-testid="stVerticalBlock"] div[data-testid="stFileUploader"] small {{ color:#94a3b8 !important; }}
+    div[data-testid="stExpander"] {{ background:#ffffff !important; border:1px solid #e5e7eb !important; border-radius:12px !important; }}
+    div[data-testid="stExpander"] summary {{ color:#334155 !important; font-weight:600 !important; background:#f9fafc !important; }}
+    div[data-testid="stTextArea"] textarea {{ background:#f8fafc !important; color:#334155 !important; border:1px solid #e5e7eb !important; border-radius:10px !important; }}
+    div[data-testid="stAlert"] {{ background:#f0fdf4 !important; color:#166534 !important; border:1px solid #bbf7d0 !important; border-radius:10px !important; }}
+    div[data-testid="stAlert"][data-alert-type="warning"] {{ background:#fffbeb !important; color:#92400e !important; border:1px solid #fde68a !important; }}
+    div[data-testid="stAlert"][data-alert-type="error"] {{ background:#fef2f2 !important; color:#991b1b !important; border:1px solid #fecaca !important; }}
+    div[data-testid="stAlert"][data-alert-type="info"] {{ background:#eff6ff !important; color:#1e40af !important; border:1px solid #bfdbfe !important; }}
+    div[data-testid="stProgress"] {{ background:#e5e7eb !important; border-radius:9999px !important; }}
+    div[data-testid="stProgress"] > div {{ background:#6366f1 !important; border-radius:9999px !important; }}
     </style>
     """, unsafe_allow_html=True)
 

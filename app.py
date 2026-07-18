@@ -101,8 +101,11 @@ def inject_global_css():
     #MainMenu {{ visibility: hidden; }}
     footer {{ visibility: hidden; }}
     .stDeployButton {{ display: none; }}
-    .block-container {{ padding-top: 0.5rem !important; padding-bottom: 0 !important; max-width: 100% !important; }}
+    .block-container {{ padding-top: 0 !important; padding-bottom: 0 !important; padding-left: 0 !important; padding-right: 0 !important; max-width: 100% !important; width: 100% !important; }}
     section[data-testid="stSidebar"] {{ display: none; }}
+    [data-testid="stToolbar"] {{ display: none; }}
+    [data-testid="stDecoration"] {{ display: none; }}
+    div[data-testid="stStatusWidget"] {{ display: none; }}
 
     :root {{
         --bg-section: #f9fafc; --border: #e5e7eb; --border-light: #f3f4f6;

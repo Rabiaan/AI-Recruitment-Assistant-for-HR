@@ -229,7 +229,9 @@ def find_candidate(cid: str):
     for c in st.session_state.candidates:
         if c["id"] == cid:
             return c
-    return st.session_state.candidates[0]
+    if st.session_state.candidates:
+        return st.session_state.candidates[0]
+    return None
 
 
 # ============================================================
@@ -275,19 +277,14 @@ def render_header():
         """, unsafe_allow_html=True)
 
     if page == "dashboard":
-        col_search, col_add, col_spacer = st.columns([5, 2, 3])
-        with col_search:
-            query = st.text_input(
-                "Search", key="search_query_widget", label_visibility="collapsed",
-                placeholder="Search by candidate name, role, or skill...",
-                value=st.session_state.search_query,
-            )
-            if query != st.session_state.search_query:
-                st.session_state.search_query = query
-                st.rerun()
-        with col_add:
-            if st.button("Add Candidate", key="open_add_modal", use_container_width=True, type="primary"):
-                add_candidate_dialog()
+        query = st.text_input(
+            "Search", key="search_query_widget", label_visibility="collapsed",
+            placeholder="Search by candidate name, role, or skill...",
+            value=st.session_state.search_query,
+        )
+        if query != st.session_state.search_query:
+            st.session_state.search_query = query
+            st.rerun()
 
 
 # ============================================================
@@ -642,54 +639,6 @@ def render_agenda():
         """, unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ============================================================
-# ADD CANDIDATE MODAL
-# ============================================================
-
-@st.dialog("Add Candidate Profile")
-def add_candidate_dialog():
-    with st.form("add_candidate_form"):
-        name = st.text_input("Full Name *", placeholder="e.g. Rachel Adams")
-        role = st.text_input("Professional Title *", placeholder="e.g. Senior Software Engineer")
-        email = st.text_input("Email Address *", placeholder="e.g. rachel@example.com")
-        skills = st.text_input("Technical Skills (comma separated) *", placeholder="e.g. React, TypeScript, AWS")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            experience_years = st.number_input("Experience (Years)", min_value=0, value=5)
-        with c2:
-            target_salary = st.text_input("Target Salary", value="$6,500")
-
-        c3, c4 = st.columns(2)
-        with c3:
-            notice_period = st.text_input("Notice Period", value="Immediate")
-        with c4:
-            status = st.selectbox("Initial Status", ["Sourced", "In Progress", "Interview"])
-
-        submitted = st.form_submit_button("Save Candidate", use_container_width=True, type="primary")
-        if submitted:
-            if not (name and role and email):
-                st.error("Name, title, and email are required.")
-                return
-            skills_list = [s.strip() for s in skills.split(",") if s.strip()]
-            new_id = f"cand-{int(datetime.now().timestamp())}"
-            new_candidate = {
-                "id": new_id, "name": name, "role": role, "email": email,
-                "joinedDate": datetime.now().strftime("%b %d, %Y"), "status": status,
-                "matchScore": 80, "experienceYears": experience_years,
-                "targetSalary": target_salary, "noticePeriod": notice_period,
-                "skills": skills_list or ["Not specified"],
-                "metrics": {"weeklyActivity": 70, "activitySplit": [{"label": "Engineering", "value": 70}, {"label": "Sync & Planning", "value": 30}]},
-                "workingFormat": {"remote": 70, "hybrid": 30, "onsite": 0},
-                "history": [{"role": role, "company": "Previous Company", "period": "2023 - 2026", "description": "Full lifecycle development and technical execution."}],
-                "strengths": [f"Strong proficiency in {skills_list[0] if skills_list else 'core role criteria'}."],
-                "gaps": ["Needs further evaluation during interview stage."],
-            }
-            st.session_state.candidates.insert(0, new_candidate)
-            st.session_state.selected_id = new_id
-            st.rerun()
 
 
 # ============================================================

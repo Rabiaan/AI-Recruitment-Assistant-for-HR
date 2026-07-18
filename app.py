@@ -34,74 +34,6 @@ MONO_FONT = "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 
 STATUS_OPTIONS = ["Sourced", "In Progress", "Interview", "Hired"]
 
 # ============================================================
-# MOCK DATA
-# ============================================================
-
-INITIAL_CANDIDATES = [
-    {
-        "id": "cand-1",
-        "name": "Sarah Chen",
-        "role": "Frontend Engineer",
-        "email": "sarah.chen@example.com",
-        "joinedDate": "Jul 02, 2026",
-        "status": "In Progress",
-        "matchScore": 88,
-        "experienceYears": 4,
-        "targetSalary": "$5,200",
-        "noticePeriod": "30 Days",
-        "skills": ["React", "TypeScript", "Tailwind", "Next.js"],
-        "metrics": {"weeklyActivity": 72, "activitySplit": [{"label": "Engineering", "value": 65}, {"label": "Sync & Planning", "value": 35}]},
-        "workingFormat": {"remote": 60, "hybrid": 40, "onsite": 0},
-        "history": [{"role": "Frontend Engineer", "company": "PixelWorks", "period": "2023 - 2026", "description": "Led migration of the marketing site to Next.js and built the design system used across 3 product teams."}],
-        "strengths": ["Strong React/TypeScript proficiency.", "Ships fast without sacrificing code quality."],
-        "gaps": ["Limited backend/API design exposure."],
-    },
-    {
-        "id": "cand-2",
-        "name": "Ahmed Raza",
-        "role": "Full Stack Developer",
-        "email": "ahmed.raza@example.com",
-        "joinedDate": "Jun 18, 2026",
-        "status": "Interview",
-        "matchScore": 81,
-        "experienceYears": 3,
-        "targetSalary": "$4,800",
-        "noticePeriod": "Immediate",
-        "skills": ["Node.js", "MongoDB", "React", "Docker"],
-        "metrics": {"weeklyActivity": 66, "activitySplit": [{"label": "Engineering", "value": 55}, {"label": "Sync & Planning", "value": 45}]},
-        "workingFormat": {"remote": 100, "hybrid": 0, "onsite": 0},
-        "history": [{"role": "Full Stack Developer", "company": "NimbusTech", "period": "2022 - 2026", "description": "Owned the checkout service end-to-end, cut p95 latency by 40% through query optimization."}],
-        "strengths": ["Comfortable owning a service end-to-end.", "Good instincts on performance issues."],
-        "gaps": ["Needs evaluation of system design at larger scale."],
-    },
-    {
-        "id": "cand-3",
-        "name": "John Willkinson",
-        "role": "Senior Software Engineer",
-        "email": "john.willkinson@example.com",
-        "joinedDate": "Jul 10, 2026",
-        "status": "Sourced",
-        "matchScore": 93,
-        "experienceYears": 6,
-        "targetSalary": "$6,500",
-        "noticePeriod": "Immediate",
-        "skills": ["React", "TypeScript", "GraphQL", "AWS", "PostgreSQL"],
-        "metrics": {"weeklyActivity": 84, "activitySplit": [{"label": "Engineering", "value": 70}, {"label": "Sync & Planning", "value": 30}]},
-        "workingFormat": {"remote": 70, "hybrid": 30, "onsite": 0},
-        "history": [{"role": "Senior Software Engineer", "company": "Previous Tech Corp", "period": "2022 - 2026", "description": "Responsible for full lifecycle development, optimizing system architectures, and mentoring junior engineers."}],
-        "strengths": ["Strong proficiency in React and system architecture.", "Demonstrated technical execution and autonomy in fast-paced software projects."],
-        "gaps": ["Needs evaluation of leadership scale and managing cross-functional product alignments."],
-    },
-]
-
-INITIAL_EVENTS = [
-    {"id": "evt-1", "time": "12:00", "type": "Interview", "title": "One to one", "meetingWith": "CEO", "link": "#"},
-    {"id": "evt-2", "time": "13:40", "type": "Meeting", "title": "Design brainstorm", "meetingWith": "Creative director", "link": "#"},
-    {"id": "evt-3", "time": "17:00", "type": "Interview", "title": "Project startup", "meetingWith": "Art director", "link": "#"},
-    {"id": "evt-4", "time": "09:00", "type": "Meeting", "title": "Design review", "meetingWith": "Art director", "link": None},
-]
-
-# ============================================================
 # CSS
 # ============================================================
 
@@ -412,12 +344,20 @@ def render_candidate_list():
     st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
 
     if not filtered:
-        st.markdown("""
-        <div style="text-align:center; padding:40px 12px; color:#94a3b8;">
-            <p style="font-weight:600; font-size:13px;">No candidates match filters</p>
-            <p style="font-size:11px;">Try a different search or status tab.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        if not candidates:
+            st.markdown("""
+            <div style="text-align:center; padding:40px 12px; color:#94a3b8;">
+                <p style="font-weight:600; font-size:13px;">No candidates yet</p>
+                <p style="font-size:11px;">Upload resumes to get started with AI-powered analysis.</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="text-align:center; padding:40px 12px; color:#94a3b8;">
+                <p style="font-weight:600; font-size:13px;">No candidates match filters</p>
+                <p style="font-size:11px;">Try a different search or status tab.</p>
+            </div>
+            """, unsafe_allow_html=True)
         return
 
     for c in filtered:
@@ -450,6 +390,14 @@ def render_candidate_list():
 
 def render_profile():
     c = find_candidate(st.session_state.selected_id)
+    if not c:
+        st.markdown("""
+        <div style="text-align:center; padding:60px 20px; color:#94a3b8;">
+            <div style="font-size:15px; font-weight:700; margin-bottom:6px;">No candidate selected</div>
+            <div style="font-size:12px;">Upload and analyze resumes to see candidate profiles here.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
 
     header_cols = st.columns([3, 2])
     with header_cols[0]:
@@ -560,6 +508,16 @@ def get_ai_response(candidate: dict, question: str) -> str:
 
 def render_ai_chat():
     c = find_candidate(st.session_state.selected_id)
+    if not c:
+        st.markdown("""
+        <div class="ai-panel">
+            <div style="text-align:center; padding:40px 20px; color:#94a3b8;">
+                <div style="font-size:13px; font-weight:600;">AI Co-Recruiter</div>
+                <div style="font-size:11px; margin-top:4px;">Select a candidate to start chatting.</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
     chat_key = c["id"]
     st.session_state.chats.setdefault(chat_key, [])
 
@@ -570,7 +528,7 @@ def render_ai_chat():
                 <div style="width:26px; height:26px; border-radius:8px; background:#6366f1; display:flex; align-items:center; justify-content:center;">{icon("sparkles", 14, "white")}</div>
                 <div>
                     <div class="ai-title">AI Co-Recruiter</div>
-                    <div class="ai-sub">Gemini 1.5 Flash · {c["name"]}</div>
+                    <div class="ai-sub">Gemini 2.0 Flash · {c["name"]}</div>
                 </div>
             </div>
             <span class="pulse-dot"></span>
@@ -634,15 +592,23 @@ def render_agenda():
         </div>
     """, unsafe_allow_html=True)
 
-    for evt in INITIAL_EVENTS:
-        st.markdown(f"""
-        <div class="agenda-event">
-            <div>
-                <span class="agenda-time">{evt["time"]}</span>
-                <span class="agenda-type {evt["type"]}">{evt["type"]}</span>
-                <div class="agenda-event-title">{evt["title"]}</div>
-                <div class="agenda-event-with">{evt["meetingWith"]}</div>
+    events = st.session_state.get("events", [])
+    if events:
+        for evt in events:
+            st.markdown(f"""
+            <div class="agenda-event">
+                <div>
+                    <span class="agenda-time">{evt["time"]}</span>
+                    <span class="agenda-type {evt["type"]}">{evt["type"]}</span>
+                    <div class="agenda-event-title">{evt["title"]}</div>
+                    <div class="agenda-event-with">{evt["meetingWith"]}</div>
+                </div>
             </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="text-align:center;padding:24px 0;color:#94a3b8;font-size:13px;">
+            No upcoming interviews scheduled
         </div>
         """, unsafe_allow_html=True)
 
@@ -979,8 +945,7 @@ def main():
             if not st.session_state.selected_id and db_candidates:
                 st.session_state.selected_id = db_candidates[0]["id"]
         elif not st.session_state.candidates:
-            st.session_state.candidates = list(INITIAL_CANDIDATES)
-            st.session_state.selected_id = "cand-3"
+            st.session_state.candidates = []
         st.session_state.db_loaded = True
 
     if not st.session_state.selected_id and st.session_state.candidates:

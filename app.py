@@ -194,6 +194,19 @@ def inject_global_css():
         box-shadow: none !important;
     }}
 
+    /* Nav buttons — white bg, black text */
+    [data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button {{
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #e5e7eb !important;
+        font-weight: 600 !important;
+        box-shadow: none !important;
+    }}
+    [data-testid="stHorizontalBlock"] div[data-testid="stButton"] > button:hover {{
+        background: #f3f4f6 !important;
+        border-color: #d1d5db !important;
+    }}
+
     /* Fix buttons in dark containers */
     .ai-panel div[data-testid="stButton"] > button {{
         background: rgba(255,255,255,0.1) !important;

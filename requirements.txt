@@ -1,0 +1,10 @@
+streamlit
+langchain
+langchain-core
+langchain-google-genai
+langchain-community
+pdfplumber
+python-dotenv
+pandas
+pydantic
+supabase

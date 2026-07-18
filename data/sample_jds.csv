@@ -1,0 +1,3 @@
+role,description,skills_required
+Senior Python Developer,"We are looking for a Senior Python Developer to build scalable backend services. You will design APIs, optimize database queries, and mentor junior engineers.","python,fastapi,docker,postgresql,redis,aws,ci/cd,testing"
+AI Engineer,"Join our AI team to develop machine learning models and deploy them to production. Experience with NLP, transformers, and MLOps is essential.","python,pytorch,tensorflow,nlp,transformers,mlops,docker,kubernetes"

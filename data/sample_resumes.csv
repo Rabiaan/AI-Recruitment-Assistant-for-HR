@@ -1,0 +1,6 @@
+name,text,skills
+John Doe,"Experienced Python backend engineer with 5+ years in FastAPI and PostgreSQL. Built scalable microservices on AWS.","python,fastapi,postgresql,aws,docker,ci/cd"
+Jane Smith,"Software Engineer skilled in React, Node.js, and TypeScript. Strong frontend background with 3 years experience.","react,nodejs,typescript,javascript,git,agile"
+Alice Johnson,"Data Scientist with expertise in Python, TensorFlow, and SQL. 2 years of ML model deployment experience.","python,tensorflow,sql,scikit-learn,pandas,jupyter"
+Bob Williams,"DevOps engineer specializing in Kubernetes, Terraform, and CI/CD pipelines. 4 years infrastructure automation.","kubernetes,terraform,gitlab-ci,bash,aws,ansible,linux"
+Carol Brown,"Full-stack developer with React and Django. Also experienced in PostgreSQL and Docker.","react,django,postgresql,docker,git,rest-api"

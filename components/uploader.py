@@ -4,6 +4,8 @@ from utils.pdf_reader import extract_text, ExtractionResult
 
 NOT_FOUND = "Not Found"
 
+MONO_FONT = "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'Courier New', monospace"
+
 
 def _validate_pdf(file) -> str | None:
     if file is None:
@@ -18,10 +20,20 @@ def _validate_pdf(file) -> str | None:
 
 
 def render_uploader():
+    st.markdown(f"""
+    <div style="background:white;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+            <span style="font-size:14px;">&#128194;</span>
+            <span style="font-size:13px;font-weight:700;color:#0f172a;">Upload Documents</span>
+            <span style="font-size:10px;color:#94a3b8;font-family:{MONO_FONT};margin-left:auto;">PDF only | Max 10 MB</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     col_jd, col_res = st.columns(2)
 
     with col_jd:
-        st.markdown('<p class="section-mono">&#128196; Job Description</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="section-label">&#128196; Job Description</p>', unsafe_allow_html=True)
         jd_file = st.file_uploader("Upload JD PDF", type=["pdf"], key="jd_uploader", label_visibility="collapsed")
 
         jd_text = ""
@@ -41,7 +53,7 @@ def render_uploader():
                     st.warning(result.warning or NOT_FOUND)
 
     with col_res:
-        st.markdown('<p class="section-mono">&#128203; Resumes</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="section-label">&#128203; Resumes</p>', unsafe_allow_html=True)
         resume_files = st.file_uploader("Upload Resumes", type=["pdf"], accept_multiple_files=True, key="resume_uploader", label_visibility="collapsed")
 
         resume_texts: list[tuple[str, str]] = []

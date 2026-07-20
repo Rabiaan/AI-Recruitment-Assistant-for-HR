@@ -11,7 +11,7 @@ except ImportError:
         return ""
 
 try:
-    from ai.chains import build_summary_chain, build_deep_analysis_chain, build_skill_match_chain, build_score_chain, build_hr_chain, build_interview_questions_chain, parse_score, parse_recommendation, parse_skill_lists, parse_interview_questions, _invoke_with_retry
+    from ai.chains import build_summary_chain, build_deep_analysis_chain, build_skill_match_chain, build_score_chain, build_hr_chain, build_interview_questions_chain, parse_score, parse_recommendation, parse_skill_lists, parse_interview_questions, _invoke_with_retry, get_token_usage_log, get_total_tokens_used
     AI_AVAILABLE = True
 except ImportError:
     AI_AVAILABLE = False
@@ -393,6 +393,45 @@ def render_stats():
       </div>
     </div>
     """, unsafe_allow_html=True)
+
+
+# ============================================================
+# TOKEN USAGE CHART
+# ============================================================
+
+def render_token_usage():
+    usage_log = get_token_usage_log()
+    total = get_total_tokens_used()
+
+    st.markdown(f"""
+    <div class="panel-card" style="margin-bottom:12px;">
+        <div class="panel-header">
+            <div class="panel-title">{icon("bar-chart", 14)} API Token Usage</div>
+            <span class="count-badge">{len(usage_log)} calls</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div class="metric-card">
+                <div class="metric-label">Total Tokens</div>
+                <div class="metric-value" style="color:#4f46e5;">{total:,}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Prompt</div>
+                <div class="metric-value" style="font-size:14px;">{sum(e.get("prompt_tokens", 0) for e in usage_log):,}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Completion</div>
+                <div class="metric-value" style="font-size:14px;">{sum(e.get("completion_tokens", 0) for e in usage_log):,}</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    if usage_log:
+        chart_data = [{"Call": f"#{i+1}", "Prompt": e.get("prompt_tokens", 0), "Completion": e.get("completion_tokens", 0)} for i, e in enumerate(usage_log)]
+        st.bar_chart(chart_data, x="Call", y=["Prompt", "Completion"], color=["#6366f1", "#a78bfa"], height=200)
+    else:
+        st.markdown('<div style="text-align:center; padding:16px; color:#94a3b8; font-size:12px;">No API calls made yet</div>', unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -1151,6 +1190,8 @@ def main():
                 render_ai_chat()
                 st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
                 render_agenda()
+                st.markdown("<div style='height:14px;'></div>", unsafe_allow_html=True)
+                render_token_usage()
 
     render_footer()
 

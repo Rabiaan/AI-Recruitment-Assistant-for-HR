@@ -12,12 +12,46 @@ from utils.prompts import (
     interview_questions_prompt,
 )
 
+_token_usage_log: list[dict] = []
 
-def _invoke_with_retry(chain, inputs, max_retries=3, backoff=15.0):
+
+def get_token_usage_log() -> list[dict]:
+    try:
+        import streamlit as st
+        return st.session_state.get("_token_log", _token_usage_log)
+    except Exception:
+        return _token_usage_log
+
+
+def get_total_tokens_used() -> int:
+    log = get_token_usage_log()
+    return sum(entry.get("total_tokens", 0) for entry in log)
+
+
+def _invoke_with_retry(chain, inputs, max_retries=5, backoff=60.0):
     last_error = None
     for attempt in range(max_retries):
         try:
-            return chain.invoke(inputs)
+            result = chain.invoke(inputs)
+            try:
+                meta = getattr(result, "usage_metadata", None)
+                if meta:
+                    entry = {
+                        "prompt_tokens": getattr(meta, "prompt_token_count", 0) or 0,
+                        "completion_tokens": getattr(meta, "candidates_token_count", 0) or 0,
+                        "total_tokens": getattr(meta, "total_token_count", 0) or 0,
+                        "model": getattr(chain, "model", "") if hasattr(chain, "model") else "",
+                    }
+                    _token_usage_log.append(entry)
+                    try:
+                        import streamlit as st
+                        st.session_state.setdefault("_token_log", [])
+                        st.session_state["_token_log"].append(entry)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            return result
         except Exception as e:
             last_error = e
             msg = str(e).lower()

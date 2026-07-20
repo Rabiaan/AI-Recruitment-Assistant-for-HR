@@ -926,7 +926,8 @@ def persist_results(jd_text: str, results: list[dict], resume_map: dict[str, str
                 growth_potential=r.get("growth_potential", ""),
             )
         return True
-    except Exception:
+    except Exception as e:
+        st.warning(f"Analysis succeeded but DB save failed: {e}")
         return False
 
 
@@ -1020,7 +1021,6 @@ def render_upload_page():
         """, unsafe_allow_html=True)
 
         jd_file = st.file_uploader("Upload JD", type=["pdf"], key="upload_jd", label_visibility="collapsed")
-        jd_text = ""
 
         if jd_file:
             if not jd_file.name.lower().endswith(".pdf"):
@@ -1031,14 +1031,17 @@ def render_upload_page():
                 jd_file.seek(0)
                 result = pdf_extract(jd_file)
                 if result.success:
-                    jd_text = result.text
+                    st.session_state["jd_text"] = result.text
                     st.success(f"Extracted — {result.page_count} page{'s' if result.page_count != 1 else ''}")
                     with st.expander("Preview JD text"):
-                        st.text_area("JD Preview", jd_text, height=160, disabled=True, key="jd_preview")
+                        st.text_area("JD Preview", result.text, height=160, disabled=True, key="jd_preview")
                 else:
                     st.warning(result.warning or "Could not extract text.")
             else:
                 st.warning("PDF reader not available.")
+
+        # Show previously extracted JD if exists
+        jd_text = st.session_state.get("jd_text", "")
 
         st.markdown(f"""
         <div class="upload-section-title" style="margin-top:24px;">{icon("users", 14)} Candidate Resumes</div>
@@ -1203,6 +1206,7 @@ def main():
         ("chats", {}),
         ("page", "dashboard"),
         ("db_loaded", False),
+        ("jd_text", ""),
     ]:
         if key not in st.session_state:
             st.session_state[key] = default

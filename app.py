@@ -11,7 +11,7 @@ except ImportError:
         return ""
 
 try:
-    from ai.chains import build_summary_chain, build_deep_analysis_chain, build_skill_match_chain, build_score_chain, build_hr_chain, build_interview_questions_chain, parse_score, parse_recommendation, parse_skill_lists, parse_interview_questions, _invoke_with_retry, get_token_usage_log, get_total_tokens_used
+    from ai.chains import build_extract_chain, build_analyze_chain, build_interview_questions_chain, parse_score, parse_recommendation, parse_skill_lists, parse_interview_questions, parse_extraction, parse_analysis, _invoke_with_retry, get_token_usage_log, get_total_tokens_used
     AI_AVAILABLE = True
 except ImportError:
     AI_AVAILABLE = False
@@ -831,18 +831,68 @@ def analyze_resume(resume_name: str, resume_text: str, jd_text: str):
     if not AI_AVAILABLE or build_candidate_result is None:
         return {"candidate_name": resume_name, "recommendation": "Error", "justification": "AI pipeline not available."}
     try:
-        summary = _invoke_with_retry(build_summary_chain(), {"resume_text": resume_text})
-        deep_analysis = _invoke_with_retry(build_deep_analysis_chain(), {"resume_text": resume_text})
-        skill_match = _invoke_with_retry(build_skill_match_chain(), {"jd_text": jd_text, "resume_text": resume_text})
-        score_text = _invoke_with_retry(build_score_chain(), {"jd_text": jd_text, "skill_match": skill_match})
-        _, missing, _ = parse_skill_lists(skill_match)
-        score = parse_score(score_text)
-        hr_text = _invoke_with_retry(build_hr_chain(), {"score": str(score), "missing_skills": ", ".join(missing), "skill_match": skill_match})
+        # STEP 1: Extract all structured data from resume (1 API call)
+        extraction_text = _invoke_with_retry(build_extract_chain(), {"resume_text": resume_text})
+        extracted = parse_extraction(extraction_text)
+
+        # STEP 2: Analyze extracted data against JD for predictions (1 API call)
+        extracted_summary = (
+            f"Education: {extracted['education']}\n"
+            f"Experience: {extracted['experience_years']} years\n"
+            f"Email: {extracted['email']}\n"
+            f"Summary: {extracted['career_summary']}\n"
+            f"Skills: {', '.join(extracted['top_skills'])}\n"
+            f"Strengths: {', '.join(extracted['strengths'])}\n"
+            f"Weaknesses: {', '.join(extracted['weaknesses'])}\n"
+            f"Technical Depth: {', '.join(extracted['technical_depth'])}\n"
+            f"Key Achievements: {', '.join(extracted['key_achievements'])}\n"
+            f"Career Trajectory: {', '.join(extracted['career_trajectory'])}\n"
+            f"Cultural Fit: {extracted['cultural_fit']}\n"
+            f"Growth Potential: {extracted['growth_potential']}"
+        )
+        analysis_text = _invoke_with_retry(build_analyze_chain(), {"jd_text": jd_text, "extracted_data": extracted_summary})
+        analysis = parse_analysis(analysis_text)
+
+        # STEP 3: Generate interview questions if recommendation allows (1 API call, conditional)
         interview_text = ""
-        rec, _ = parse_recommendation(hr_text)
-        if rec.lower() in ("hire", "interview"):
-            interview_text = _invoke_with_retry(build_interview_questions_chain(), {"jd_text": jd_text, "summary": summary})
-        result = build_candidate_result(candidate_name=resume_name, summary_text=summary, skill_match_text=skill_match, score_text=score_text, hr_text=hr_text, interview_text=interview_text, deep_analysis_text=deep_analysis)
+        if analysis["recommendation"].lower() in ("hire", "interview"):
+            interview_text = _invoke_with_retry(build_interview_questions_chain(), {"jd_text": jd_text, "summary": extracted["career_summary"]})
+            tech_qs, hr_qs = parse_interview_questions(interview_text)
+        else:
+            tech_qs, hr_qs = [], []
+
+        # Build result
+        result = build_candidate_result(
+            candidate_name=resume_name,
+            summary_text=extracted["career_summary"],
+            skill_match_text=analysis_text,
+            score_text=f"SCORE: {analysis['score']}",
+            hr_text=f"RECOMMENDATION: {analysis['recommendation']}\nJUSTIFICATION: {analysis['justification']}",
+            interview_text=interview_text,
+            deep_analysis_text=extraction_text,
+        )
+
+        # Override with extracted data (more reliable than re-parsing)
+        result.education = extracted["education"]
+        result.experience_years = extracted["experience_years"]
+        result.email = extracted["email"]
+        result.matching_skills = analysis["matching_skills"]
+        result.missing_skills = analysis["missing_skills"]
+        result.extra_skills = analysis["extra_skills"]
+        result.score = analysis["score"]
+        result.recommendation = analysis["recommendation"]
+        result.justification = analysis["justification"]
+        result.technical_questions = tech_qs
+        result.hr_questions = hr_qs
+        result.career_summary = extracted["career_summary"]
+        result.technical_depth = extracted["technical_depth"]
+        result.key_achievements = extracted["key_achievements"]
+        result.career_trajectory = extracted["career_trajectory"]
+        result.strengths = extracted["strengths"]
+        result.weaknesses = extracted["weaknesses"]
+        result.cultural_fit = extracted["cultural_fit"]
+        result.growth_potential = extracted["growth_potential"]
+
         return result.model_dump()
     except Exception as e:
         err_msg = str(e)

@@ -4,11 +4,8 @@ import time
 from langchain_core.output_parsers import StrOutputParser
 from .llm import get_llm
 from utils.prompts import (
-    summary_prompt,
-    deep_analysis_prompt,
-    skill_match_prompt,
-    score_prompt,
-    hr_prompt,
+    extract_prompt,
+    analyze_prompt,
     interview_questions_prompt,
 )
 
@@ -64,29 +61,14 @@ def _invoke_with_retry(chain, inputs, max_retries=5, backoff=60.0):
     raise last_error
 
 
-def build_summary_chain():
+def build_extract_chain():
     llm = get_llm(temperature=0.2)
-    return summary_prompt | llm | StrOutputParser()
+    return extract_prompt | llm | StrOutputParser()
 
 
-def build_deep_analysis_chain():
-    llm = get_llm(temperature=0.3)
-    return deep_analysis_prompt | llm | StrOutputParser()
-
-
-def build_skill_match_chain():
+def build_analyze_chain():
     llm = get_llm(temperature=0.2)
-    return skill_match_prompt | llm | StrOutputParser()
-
-
-def build_score_chain():
-    llm = get_llm(temperature=0.2)
-    return score_prompt | llm | StrOutputParser()
-
-
-def build_hr_chain():
-    llm = get_llm(temperature=0.2)
-    return hr_prompt | llm | StrOutputParser()
+    return analyze_prompt | llm | StrOutputParser()
 
 
 def build_interview_questions_chain():
@@ -149,13 +131,17 @@ def parse_interview_questions(text: str) -> tuple[list[str], list[str]]:
         elif current is not None and line.strip().startswith("-"):
             q = line.strip().lstrip("-").strip()
             if q:
-                current.append(q)
+                technical.append(q) if current == technical else behavioral.append(q)
     return technical, behavioral
 
 
-def parse_deep_analysis(text: str) -> dict:
+def parse_extraction(text: str) -> dict:
     result = {
+        "education": "Not specified",
+        "experience_years": 0.0,
+        "email": "Not specified",
         "career_summary": "",
+        "top_skills": [],
         "technical_depth": [],
         "key_achievements": [],
         "career_trajectory": [],
@@ -168,8 +154,22 @@ def parse_deep_analysis(text: str) -> dict:
     for line in text.split("\n"):
         stripped = line.strip()
         upper = stripped.upper()
-        if upper.startswith("CAREER_SUMMARY:"):
+        if upper.startswith("EDUCATION:"):
+            result["education"] = stripped.split(":", 1)[1].strip()
+            current_section = None
+        elif upper.startswith("EXPERIENCE_YEARS:"):
+            val = re.search(r"(\d+)", stripped.split(":", 1)[1])
+            result["experience_years"] = float(val.group(1)) if val else 0.0
+            current_section = None
+        elif upper.startswith("EMAIL:"):
+            result["email"] = stripped.split(":", 1)[1].strip()
+            current_section = None
+        elif upper.startswith("CAREER_SUMMARY:"):
             result["career_summary"] = stripped.split(":", 1)[1].strip()
+            current_section = None
+        elif upper.startswith("TOP_SKILLS:"):
+            skills_str = stripped.split(":", 1)[1].strip()
+            result["top_skills"] = [s.strip() for s in skills_str.split(",") if s.strip()]
             current_section = None
         elif "TECHNICAL_DEPTH" in upper:
             current_section = "technical_depth"
@@ -189,6 +189,20 @@ def parse_deep_analysis(text: str) -> dict:
             current_section = None
         elif current_section and stripped.startswith("-"):
             item = stripped.lstrip("-").strip()
-            if item:
+            if item and current_section in result:
                 result[current_section].append(item)
     return result
+
+
+def parse_analysis(text: str) -> dict:
+    matching, missing, extra = parse_skill_lists(text)
+    score = parse_score(text)
+    rec, justification = parse_recommendation(text)
+    return {
+        "matching_skills": matching,
+        "missing_skills": missing,
+        "extra_skills": extra,
+        "score": score,
+        "recommendation": rec,
+        "justification": justification,
+    }

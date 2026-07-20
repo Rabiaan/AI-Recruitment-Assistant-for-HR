@@ -91,7 +91,7 @@ def build_candidate_result(
         parse_recommendation,
         parse_skill_lists,
         parse_interview_questions,
-        parse_deep_analysis,
+        parse_extraction,
     )
 
     matching, missing, extra = parse_skill_lists(skill_match_text)
@@ -111,7 +111,10 @@ def build_candidate_result(
         raw_data["hr_questions"] = beh
 
     if deep_analysis_text:
-        deep = parse_deep_analysis(deep_analysis_text)
+        deep = parse_extraction(deep_analysis_text)
+        raw_data["education"] = deep.get("education", "Not specified")
+        raw_data["experience_years"] = deep.get("experience_years", 0.0)
+        raw_data["email"] = deep.get("email", "Not specified")
         raw_data["career_summary"] = deep.get("career_summary", "")
         raw_data["technical_depth"] = deep.get("technical_depth", [])
         raw_data["key_achievements"] = deep.get("key_achievements", [])
